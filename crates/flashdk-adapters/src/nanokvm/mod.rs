@@ -164,7 +164,7 @@ impl Device for NanoKvm {
             video_h264: true,
             video_webrtc: false,
             power_on_off: true,
-            power_reset: false,
+            power_reset: true, // real reset line via GPIO (type "reset")
             virtual_media: true,
             wake_on_lan: false,
             tls_pinnable: false,
@@ -227,12 +227,21 @@ impl Hid for NanoKvm {
 
 // Power and virtual media remain stubs for this slice.
 impl Power for NanoKvm {
-    async fn action(&self, _action: PowerAction) -> Result<()> {
-        // POST /api/vm/gpio takes a named "power event" string. The valid names aren't
-        // exposed by the validator, and we won't trigger a real event just to learn
-        // them (that would power-cycle the target). Deferred until we can source the
-        // names cleanly (official docs or a safe capture).
-        Err(Error::NotImplemented)
+    async fn action(&self, action: PowerAction) -> Result<()> {
+        // POST /api/vm/gpio {type, duration}: hold the power/reset line for `duration`
+        // milliseconds. Valid types are "power" and "reset" (confirmed on the wire);
+        // durations follow standard ATX timing (short tap vs. ~5s force-off long press).
+        let (event, duration_ms) = match action {
+            PowerAction::On | PowerAction::ShortPress => ("power", 100),
+            PowerAction::LongPress => ("power", 5000),
+            PowerAction::Reset => ("reset", 100),
+        };
+        self.post_json(
+            "/api/vm/gpio",
+            serde_json::json!({ "type": event, "duration": duration_ms }),
+        )
+        .await
+        .map(|_| ())
     }
 
     async fn state(&self) -> Result<PowerState> {

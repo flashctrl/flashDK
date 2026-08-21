@@ -34,8 +34,10 @@ is not yet characterized.
 ## REST endpoints (aux HID, power, storage) — observed contracts
 
 - GET  /api/vm/gpio                 -> {pwr, hdd}  (power/activity state)
-- POST /api/vm/gpio {type: <event>} -> power event; valid event names NOT enumerated by
-  the validator and not triggered (would power-cycle the target) — action deferred.
+- POST /api/vm/gpio {type, duration} -> hold power/reset line for `duration` ms.
+  Valid `type` values: "power" and "reset" (confirmed via duration:0 probes, which
+  validate the name without actuating; all other candidates return "invalid power event").
+  Short tap vs. ~5s long-press (force off) selected by duration.
 - GET  /api/storage/image           -> {files: [...]|null}  (available images)
 - GET  /api/storage/image/mounted   -> {file: ""}           (currently mounted, "" = none)
 - POST /api/storage/image/mount {file: name} mounts; {file: ""} unmounts.
