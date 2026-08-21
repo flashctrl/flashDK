@@ -33,9 +33,20 @@ struct MousePos {
 /// A connected NanoKVM.
 pub struct NanoKvm {
     host: String,
+    base_url: String,
+    http: reqwest::Client,
+    token: String,
     ws: AsyncMutex<WsSink>,
     keyboard: Mutex<KeyboardState>,
     mouse: Mutex<MousePos>,
+}
+
+/// NanoKVM's uniform reply shape: `{"code": 0, "msg": ..., "data": {...}}`.
+#[derive(serde::Deserialize)]
+struct NkResponse {
+    code: i64,
+    #[serde(default)]
+    data: serde_json::Value,
 }
 
 impl NanoKvm {
@@ -71,6 +82,9 @@ impl NanoKvm {
 
         Ok(Self {
             host,
+            base_url,
+            http,
+            token,
             ws: AsyncMutex::new(sink),
             keyboard: Mutex::new(KeyboardState::default()),
             mouse: Mutex::new(MousePos::default()),
@@ -87,6 +101,47 @@ impl NanoKvm {
         sink.send(Message::Binary(bytes))
             .await
             .map_err(|e| Error::Transport(e.to_string()))
+    }
+
+    /// GET a REST path, returning its `data` payload (auth via the token cookie).
+    async fn get_data(&self, path: &str) -> Result<serde_json::Value> {
+        let resp = self
+            .http
+            .get(format!("{}{}", self.base_url, path))
+            .header("Cookie", format!("nano-kvm-token={}", self.token))
+            .send()
+            .await
+            .map_err(|e| Error::Transport(e.to_string()))?;
+        let r: NkResponse = resp
+            .json()
+            .await
+            .map_err(|e| Error::Protocol(e.to_string()))?;
+        if r.code == 0 {
+            Ok(r.data)
+        } else {
+            Err(Error::Protocol(format!("nanokvm code {}", r.code)))
+        }
+    }
+
+    /// POST JSON to a REST path, returning its `data` payload.
+    async fn post_json(&self, path: &str, body: serde_json::Value) -> Result<serde_json::Value> {
+        let resp = self
+            .http
+            .post(format!("{}{}", self.base_url, path))
+            .header("Cookie", format!("nano-kvm-token={}", self.token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| Error::Transport(e.to_string()))?;
+        let r: NkResponse = resp
+            .json()
+            .await
+            .map_err(|e| Error::Protocol(e.to_string()))?;
+        if r.code == 0 {
+            Ok(r.data)
+        } else {
+            Err(Error::Protocol(format!("nanokvm code {}", r.code)))
+        }
     }
 }
 
@@ -173,21 +228,64 @@ impl Hid for NanoKvm {
 // Power and virtual media remain stubs for this slice.
 impl Power for NanoKvm {
     async fn action(&self, _action: PowerAction) -> Result<()> {
+        // POST /api/vm/gpio takes a named "power event" string. The valid names aren't
+        // exposed by the validator, and we won't trigger a real event just to learn
+        // them (that would power-cycle the target). Deferred until we can source the
+        // names cleanly (official docs or a safe capture).
         Err(Error::NotImplemented)
     }
+
     async fn state(&self) -> Result<PowerState> {
-        Err(Error::NotImplemented)
+        let d = self.get_data("/api/vm/gpio").await?;
+        Ok(PowerState {
+            powered: d["pwr"].as_bool(),
+            hdd_activity: d["hdd"].as_bool(),
+        })
     }
 }
 
 impl VirtualMedia for NanoKvm {
     async fn list(&self) -> Result<Vec<MediaImage>> {
-        Err(Error::NotImplemented)
+        let data = self.get_data("/api/storage/image").await?;
+        let mounted = self
+            .get_data("/api/storage/image/mounted")
+            .await
+            .ok()
+            .and_then(|m| m["file"].as_str().map(str::to_string));
+        let mut out = Vec::new();
+        if let Some(files) = data["files"].as_array() {
+            for f in files {
+                // Element shape when populated is unverified (device had no images at
+                // capture time); accept a bare filename string or a {name,size} object.
+                let name = f.as_str().or_else(|| f["name"].as_str());
+                if let Some(name) = name {
+                    out.push(MediaImage {
+                        name: name.to_string(),
+                        size: f["size"].as_u64(),
+                        mounted: mounted.as_deref() == Some(name),
+                    });
+                }
+            }
+        }
+        Ok(out)
     }
-    async fn mount(&self, _name: &str) -> Result<()> {
-        Err(Error::NotImplemented)
+
+    async fn mount(&self, name: &str) -> Result<()> {
+        self.post_json(
+            "/api/storage/image/mount",
+            serde_json::json!({ "file": name }),
+        )
+        .await
+        .map(|_| ())
     }
+
     async fn unmount(&self) -> Result<()> {
-        Err(Error::NotImplemented)
+        // An empty file unmounts (observed: posting no file returns "unmount ...").
+        self.post_json(
+            "/api/storage/image/mount",
+            serde_json::json!({ "file": "" }),
+        )
+        .await
+        .map(|_| ())
     }
 }

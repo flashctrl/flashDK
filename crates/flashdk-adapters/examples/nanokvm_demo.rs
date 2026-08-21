@@ -7,6 +7,8 @@
 //! ```
 
 use flashdk_adapters::nanokvm::NanoKvm;
+use flashdk_core::media::VirtualMedia;
+use flashdk_core::power::Power;
 use flashdk_core::Device;
 
 #[tokio::main]
@@ -24,6 +26,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("Transport: {:?}", kvm.transport_kind());
     println!("Capabilities: {:#?}", kvm.capabilities());
+    match kvm.state().await {
+        Ok(st) => println!("Power state: {:?}", st),
+        Err(e) => println!("Power state: unavailable ({e})"),
+    }
+    match kvm.list().await {
+        Ok(imgs) => println!("Virtual-media images: {}", imgs.len()),
+        Err(e) => println!("Media list: unavailable ({e})"),
+    }
     println!("Login + WebSocket OK — no input was sent.");
     Ok(())
 }

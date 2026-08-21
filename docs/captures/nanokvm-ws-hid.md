@@ -30,3 +30,12 @@ generated. No vendor source was read — only the frames on the wire.
 
 Note: only absolute mouse (type 0x02) was observed. A relative-mouse frame type, if any,
 is not yet characterized.
+
+## REST endpoints (aux HID, power, storage) — observed contracts
+
+- GET  /api/vm/gpio                 -> {pwr, hdd}  (power/activity state)
+- POST /api/vm/gpio {type: <event>} -> power event; valid event names NOT enumerated by
+  the validator and not triggered (would power-cycle the target) — action deferred.
+- GET  /api/storage/image           -> {files: [...]|null}  (available images)
+- GET  /api/storage/image/mounted   -> {file: ""}           (currently mounted, "" = none)
+- POST /api/storage/image/mount {file: name} mounts; {file: ""} unmounts.
