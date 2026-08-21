@@ -1,7 +1,8 @@
 //! Machine power control — one concept, three mechanisms underneath.
 //!
 //! Not every action exists on every device (NanoKVM has no true reset). Adapters
-//! return [`Error::NotSupported`] for actions their hardware can't do, and the app
+//! return [`Error::NotSupported`](crate::Error::NotSupported) for actions their
+//! hardware can't do, and the app
 //! should consult [`Capabilities`](crate::Capabilities) before offering the button.
 
 use crate::error::Result;

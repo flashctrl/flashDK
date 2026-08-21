@@ -5,14 +5,13 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel superseded runs on the same ref.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: build & lint
+    name: build, lint & docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,15 +25,47 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Type-check
         run: cargo check --all-targets
+      - name: Docs build clean
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
 
-  licenses:
-    name: clean-room license gate
+  compliance:
+    name: license, supply-chain & clean-room
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Fails the build if any dependency carries a license not on the permissive
-      # allow-list in deny.toml — the machine-enforced half of CLEANROOM.md. A GPL or
-      # LGPL crate sneaking into the tree stops the merge here.
-      - uses: EmbarkStudios/cargo-deny-action@v2
+
+      # Licenses + security advisories + dependency bans + source integrity.
+      # The machine-enforced half of CLEANROOM.md — a copyleft or unknown-source
+      # dependency fails the build.
+      - name: cargo-deny (licenses, advisories, bans, sources)
+        uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          command: check licenses
+          command: check licenses advisories bans sources
+
+      # Clean-room methodology: every vendor adapter must ship a provenance
+      # attestation. No provenance, no merge.
+      - name: Clean-room provenance present for every adapter
+        shell: bash
+        run: |
+          fail=0
+          for d in crates/flashdk-adapters/src/*/; do
+            if [ ! -f "${d}PROVENANCE.md" ]; then
+              echo "::error::Missing PROVENANCE.md in ${d} — clean-room rule (see CLEANROOM.md)"
+              fail=1
+            fi
+          done
+          [ "$fail" = 0 ] && echo "All adapters carry PROVENANCE.md."
+          exit $fail
+
+      # Trademark hygiene: vendor marks may be used nominatively in prose, never in
+      # package identity/branding. Keeps us clear of trademark claims.
+      - name: No vendor trademark in package identity
+        shell: bash
+        run: |
+          if grep -rniE '^\s*name\s*=\s*".*(pikvm|nanokvm|jetkvm|sipeed|gl-?inet)' --include=Cargo.toml .; then
+            echo "::error::Vendor trademark found in a package name — keep marks nominative, not in identity"
+            exit 1
+          fi
+          echo "Package identity is trademark-clean."

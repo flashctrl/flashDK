@@ -1,0 +1,4 @@
+# Pins the toolchain and components so every contributor and CI run is reproducible.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

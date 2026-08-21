@@ -1,15 +1,17 @@
-# cargo-deny configuration — enforces the dependency half of CLEANROOM.md.
+# cargo-deny — the machine-enforced compliance layer for flashDK.
 #
-# The SDK ships under Apache-2.0 and must stay embeddable in proprietary clients, so
-# every dependency must be permissively licensed. This allow-list is authoritative:
-# any crate whose license is NOT listed here fails CI. That is deliberate — a GPL /
-# LGPL / AGPL dependency should break the build, loudly.
-#
-# If CI flags a genuinely permissive license we simply forgot to list, add it here.
+# Goal: make the project legally and operationally defensible by construction
+# (license-clean, supply-chain-clean, clean-room). Every check below runs in CI on
+# every push and PR; a violation fails the build.
 
+[graph]
+all-features = true
+
+# --- Licenses: permissive only, so the Apache-2.0 SDK stays embeddable in
+# proprietary clients. A GPL/LGPL/AGPL dependency fails the build. ---
 [licenses]
-# Permissive licenses only. No GPL/LGPL/AGPL/copyleft (except MPL-2.0, which is
-# file-level and safe to embed).
+version = 2
+confidence-threshold = 0.9
 allow = [
     "MIT",
     "Apache-2.0",
@@ -25,12 +27,23 @@ allow = [
     "CC0-1.0",
     "BSL-1.0",
 ]
-confidence-threshold = 0.9
 
-[bans]
-# Room for future rules (e.g. banning a specific GPL crate by name). Empty for now;
-# the license allow-list above already blocks copyleft.
-
+# --- Security advisories (RustSec): fail on known vulnerabilities and yanked crates. ---
 [advisories]
-# Use cargo-deny defaults for the RustSec advisory DB. (Not gated in CI yet — this
-# workflow only runs `check licenses` — but the config is ready if we add it.)
+version = 2
+yanked = "deny"
+ignore = []  # add specific RUSTSEC IDs here only with a written justification
+
+# --- Dependency bans: no wildcard version requirements (supply-chain hygiene).
+# Our own workspace path deps are exempt via allow-wildcard-paths. ---
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+# --- Sources: dependencies may come only from crates.io. No arbitrary git deps,
+# which is where a clean-room violation or supply-chain risk would sneak in. ---
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
