@@ -1,0 +1,36 @@
+# cargo-deny configuration — enforces the dependency half of CLEANROOM.md.
+#
+# The SDK ships under Apache-2.0 and must stay embeddable in proprietary clients, so
+# every dependency must be permissively licensed. This allow-list is authoritative:
+# any crate whose license is NOT listed here fails CI. That is deliberate — a GPL /
+# LGPL / AGPL dependency should break the build, loudly.
+#
+# If CI flags a genuinely permissive license we simply forgot to list, add it here.
+
+[licenses]
+# Permissive licenses only. No GPL/LGPL/AGPL/copyleft (except MPL-2.0, which is
+# file-level and safe to embed).
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "CC0-1.0",
+    "BSL-1.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Room for future rules (e.g. banning a specific GPL crate by name). Empty for now;
+# the license allow-list above already blocks copyleft.
+
+[advisories]
+# Use cargo-deny defaults for the RustSec advisory DB. (Not gated in CI yet — this
+# workflow only runs `check licenses` — but the config is ready if we add it.)
