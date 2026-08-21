@@ -3,7 +3,7 @@
 //! An adapter implements the input/power/media traits *and* [`Device`], which adds the
 //! self-description the app needs: who it is, what it can do, and which transport shape
 //! it uses. Note there is **no vendor-specific type in this crate** — the concrete
-//! `Kvm` dispatcher lives in `flashctrl-adapters`, keeping core vendor-agnostic.
+//! `Kvm` dispatcher lives in `flashdk-adapters`, keeping core vendor-agnostic.
 
 use crate::capability::{Capabilities, Vendor};
 use crate::hid::Hid;
@@ -29,7 +29,7 @@ pub struct DeviceInfo {
 ///
 /// Because the capability traits use `async fn`, `Device` is not object-safe — you
 /// can't write `Box<dyn Device>`. That's deliberate: for runtime polymorphism across
-/// vendors we use the `Kvm` enum in `flashctrl-adapters`, which is faster and clearer
+/// vendors we use the `Kvm` enum in `flashdk-adapters`, which is faster and clearer
 /// than dynamic dispatch anyway.
 pub trait Device: Hid + Power + VirtualMedia {
     /// Static identity/firmware info (cheap; no network call).

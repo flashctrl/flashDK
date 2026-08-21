@@ -1,12 +1,12 @@
 [package]
-name = "flashctrl-adapters"
-description = "Per-vendor adapters implementing flashctrl-core traits. Clean-room, Apache-2.0."
+name = "flashdk-adapters"
+description = "Per-vendor adapters implementing flashdk-core traits. Clean-room, Apache-2.0."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-flashctrl-core = { path = "../flashctrl-core" }
+flashdk-core = { path = "../flashdk-core" }
 # HTTP client for REST-based devices (PiKVM, NanoKVM). All permissively licensed.
 # `json` pulls serde support; default TLS (native-tls) is fine on desktop — we'll
 # switch to rustls for mobile cross-compiles later, and add TOFU cert pinning then.

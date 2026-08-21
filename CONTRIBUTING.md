@@ -1,4 +1,4 @@
-# Contributing to flashctrl-sdk
+# Contributing to flashDK
 
 Thanks for your interest! One rule matters more than any other here.
 
@@ -32,6 +32,6 @@ cargo check --all-targets
 ## Adding a vendor adapter
 
 1. Probe a device you physically own; capture the traffic into `docs/captures/`.
-2. Implement the `flashctrl-core` traits from those captures.
+2. Implement the `flashdk-core` traits from those captures.
 3. Add a `PROVENANCE.md` attesting wire-only sourcing.
 4. Keep dependencies permissive (see `deny.toml`).

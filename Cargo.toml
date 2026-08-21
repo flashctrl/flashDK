@@ -1,9 +1,9 @@
-# flashctrl-sdk — Cargo workspace root.
+# flashDK — Cargo workspace root.
 # A "workspace" lets several related crates (Rust packages) live in one repo and
 # build together. We have two so far:
-#   * flashctrl-core     — the vendor-neutral model (traits, types). Knows nothing
+#   * flashdk-core     — the vendor-neutral model (traits, types). Knows nothing
 #                          about any specific device.
-#   * flashctrl-adapters — one module per KVM vendor, each teaching flashctrl-core's
+#   * flashdk-adapters — one module per KVM vendor, each teaching flashdk-core's
 #                          traits how to talk to that device.
 # The native apps (and any third-party client) depend on these, plus a thin UniFFI
 # layer we add later to generate Swift/Kotlin bindings.
@@ -11,12 +11,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/flashctrl-core",
-    "crates/flashctrl-adapters",
+    "crates/flashdk-core",
+    "crates/flashdk-adapters",
 ]
 
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/flashctrl/flashctrl-sdk"
+repository = "https://github.com/flashctrl/flashDK"

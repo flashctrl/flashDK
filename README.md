@@ -1,4 +1,4 @@
-# flashctrl-sdk
+# flashDK
 
 A clean-room, **Apache-2.0** SDK for controlling IP-KVM devices across vendors
 (Sipeed NanoKVM, PiKVM, JetKVM; GL.iNet planned). One protocol implementation, meant to
@@ -12,7 +12,7 @@ proprietary or open.
 
 ```
 crates/
-  flashctrl-core/       # vendor-neutral model: traits + types, zero dependencies
+  flashdk-core/       # vendor-neutral model: traits + types, zero dependencies
     src/
       capability.rs     # Capabilities (what a device supports) + Vendor
       transport.rs      # TransportKind — REST/WS vs WebRTC-DataChannel-RPC (key split)
@@ -21,7 +21,7 @@ crates/
       media.rs          # virtual media (mount ISO/image)
       device.rs         # Device umbrella trait + DeviceInfo
       error.rs          # one Error type
-  flashctrl-adapters/   # one module per vendor, implements the core traits
+  flashdk-adapters/   # one module per vendor, implements the core traits
     src/
       nanokvm/  pikvm/  jetkvm/     (+ PROVENANCE.md each)
       lib.rs            # `Kvm` enum — runtime dispatch across vendors, no `dyn`
@@ -30,8 +30,8 @@ docs/captures/          # raw wire-capture evidence (the clean-room audit trail)
 
 ## Reading order (for learning)
 
-`flashctrl-core/src/lib.rs` → `capability.rs` → `transport.rs` → `hid.rs` →
-`device.rs`, then `flashctrl-adapters/src/lib.rs` and one adapter. The doc-comments
+`flashdk-core/src/lib.rs` → `capability.rs` → `transport.rs` → `hid.rs` →
+`device.rs`, then `flashdk-adapters/src/lib.rs` and one adapter. The doc-comments
 (`//!` and `///`) explain the *why*, not just the *what*.
 
 ## Status

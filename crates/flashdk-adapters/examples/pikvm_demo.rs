@@ -4,16 +4,16 @@
 //!
 //! ```bash
 //! PIKVM_HOST=10.0.10.20 PIKVM_USER=admin PIKVM_PASS='...' \
-//!   cargo run -p flashctrl-adapters --example pikvm_demo
+//!   cargo run -p flashdk-adapters --example pikvm_demo
 //! ```
 //!
 //! It connects, prints what the device can do, then moves the mouse to screen-center
 //! — a deliberately harmless action. (It will move the real cursor on whatever is
 //! attached to the PiKVM.)
 
-use flashctrl_adapters::pikvm::PiKvm;
-use flashctrl_core::hid::{AbsMouse, Hid};
-use flashctrl_core::Device;
+use flashdk_adapters::pikvm::PiKvm;
+use flashdk_core::hid::{AbsMouse, Hid};
+use flashdk_core::Device;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,7 +30,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Move the pointer to the center of the screen (16384 ≈ midpoint of 0..=32767).
     println!("Moving mouse to center…");
-    kvm.absolute_mouse(AbsMouse { x: 16384, y: 16384, buttons: 0 }).await?;
+    kvm.absolute_mouse(AbsMouse {
+        x: 16384,
+        y: 16384,
+        buttons: 0,
+    })
+    .await?;
     println!("Done. If a display is attached, the cursor jumped to center.");
 
     Ok(())

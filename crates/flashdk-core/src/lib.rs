@@ -1,9 +1,9 @@
-//! # flashctrl-core
+//! # flashdk-core
 //!
 //! The vendor-neutral heart of the SDK. It defines *what a KVM can do* as a set of
 //! small Rust traits (contracts) and plain data types — and deliberately knows
 //! nothing about NanoKVM, PiKVM, or JetKVM. Each vendor's quirks live in
-//! `flashctrl-adapters`, which implements these traits.
+//! `flashdk-adapters`, which implements these traits.
 //!
 //! ## Why it's shaped this way
 //!
@@ -34,7 +34,7 @@ pub mod power;
 pub mod transport;
 
 // Re-export the handful of types callers reach for most, so app code can write
-// `use flashctrl_core::{Kvm, Vendor, Result};` without spelunking submodules.
+// `use flashdk_core::{Kvm, Vendor, Result};` without spelunking submodules.
 pub use capability::{Capabilities, Vendor};
 pub use device::{Device, DeviceInfo};
 pub use error::{Error, Result};

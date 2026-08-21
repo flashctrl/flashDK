@@ -3,11 +3,11 @@
 //! Capabilities and transport below reflect what we observed live on app 2.5.0
 //! (10.0.10.10). See `PROVENANCE.md` in this folder. All actions are stubs today.
 
-use flashctrl_core::capability::Vendor;
-use flashctrl_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
-use flashctrl_core::media::{MediaImage, VirtualMedia};
-use flashctrl_core::power::{Power, PowerAction, PowerState};
-use flashctrl_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::capability::Vendor;
+use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
+use flashdk_core::media::{MediaImage, VirtualMedia};
+use flashdk_core::power::{Power, PowerAction, PowerState};
+use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
 
 /// A connected NanoKVM. Real fields (base URL, JWT cookie, HTTP client) arrive when we
 /// wire behaviour; for now it just remembers where the device is.

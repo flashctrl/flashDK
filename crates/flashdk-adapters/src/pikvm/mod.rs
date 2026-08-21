@@ -10,11 +10,11 @@
 
 mod keymap;
 
-use flashctrl_core::capability::Vendor;
-use flashctrl_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
-use flashctrl_core::media::{MediaImage, VirtualMedia};
-use flashctrl_core::power::{Power, PowerAction, PowerState};
-use flashctrl_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::capability::Vendor;
+use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
+use flashdk_core::media::{MediaImage, VirtualMedia};
+use flashdk_core::power::{Power, PowerAction, PowerState};
+use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
 
 /// kvmd's uniform reply shape: `{"ok": bool, "result": {...}}`.
 #[derive(serde::Deserialize)]
@@ -82,8 +82,11 @@ impl PiKvm {
     async fn sync_buttons(&self, mask: u8) -> Result<()> {
         for (bit, name) in [(0u8, "left"), (1, "right"), (2, "middle")] {
             let pressed = mask & (1u8 << bit) != 0;
-            self.post_event("send_mouse_button", &format!("button={name}&state={pressed}"))
-                .await?;
+            self.post_event(
+                "send_mouse_button",
+                &format!("button={name}&state={pressed}"),
+            )
+            .await?;
         }
         Ok(())
     }
@@ -123,8 +126,8 @@ impl Device for PiKvm {
 impl Hid for PiKvm {
     async fn key(&self, event: KeyEvent) -> Result<()> {
         // Translate our standard USB HID usage id into kvmd's W3C code name.
-        let code = keymap::usage_to_code(event.key.0)
-            .ok_or(Error::NotSupported("key not in keymap"))?;
+        let code =
+            keymap::usage_to_code(event.key.0).ok_or(Error::NotSupported("key not in keymap"))?;
         self.post_event("send_key", &format!("key={code}&state={}", event.pressed))
             .await
     }
@@ -149,8 +152,11 @@ impl Hid for PiKvm {
 
     async fn wheel(&self, w: Wheel) -> Result<()> {
         // kvmd takes both axes; we drive vertical.
-        self.post_event("send_mouse_wheel", &format!("delta_x=0&delta_y={}", w.delta))
-            .await
+        self.post_event(
+            "send_mouse_wheel",
+            &format!("delta_x=0&delta_y={}", w.delta),
+        )
+        .await
     }
 }
 

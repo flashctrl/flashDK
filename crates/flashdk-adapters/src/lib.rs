@@ -1,6 +1,6 @@
-//! # flashctrl-adapters
+//! # flashdk-adapters
 //!
-//! One module per vendor, each teaching `flashctrl-core`'s traits how to speak to a
+//! One module per vendor, each teaching `flashdk-core`'s traits how to speak to a
 //! real device. Every line here is derived from **wire observation and official docs
 //! only** — never from any vendor's source. See `CLEANROOM.md`.
 //!
@@ -15,10 +15,10 @@ pub mod jetkvm;
 pub mod nanokvm;
 pub mod pikvm;
 
-use flashctrl_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
-use flashctrl_core::media::{MediaImage, VirtualMedia};
-use flashctrl_core::power::{Power, PowerAction, PowerState};
-use flashctrl_core::{Capabilities, Device, DeviceInfo, Result, TransportKind};
+use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
+use flashdk_core::media::{MediaImage, VirtualMedia};
+use flashdk_core::power::{Power, PowerAction, PowerState};
+use flashdk_core::{Capabilities, Device, DeviceInfo, Result, TransportKind};
 
 /// Runtime polymorphism across vendors without `dyn`. The app holds a `Kvm` and calls
 /// methods on it; each call fans out to the concrete adapter inside. Adding a vendor

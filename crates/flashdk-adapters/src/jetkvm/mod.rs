@@ -5,11 +5,11 @@
 //! keystroke. Observed live on 10.0.10.21. RPC method names (e.g. `keyboardReport`,
 //! `setATXPowerAction`) were read off the wire/frontend, not from source.
 
-use flashctrl_core::capability::Vendor;
-use flashctrl_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
-use flashctrl_core::media::{MediaImage, VirtualMedia};
-use flashctrl_core::power::{Power, PowerAction, PowerState};
-use flashctrl_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::capability::Vendor;
+use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
+use flashdk_core::media::{MediaImage, VirtualMedia};
+use flashdk_core::power::{Power, PowerAction, PowerState};
+use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
 
 pub struct JetKvm {
     pub host: String,
@@ -39,10 +39,10 @@ impl Device for JetKvm {
             video_mjpeg: false, // WebRTC only — no MJPEG fallback
             video_h264: true,
             video_webrtc: true,
-            power_on_off: true,  // via ATX/DC extension hardware
+            power_on_off: true, // via ATX/DC extension hardware
             power_reset: true,
             virtual_media: true,
-            wake_on_lan: true, // getWakeOnLanDevices
+            wake_on_lan: true,   // getWakeOnLanDevices
             tls_pinnable: false, // HTTP signaling; media secured by WebRTC's own DTLS
         }
     }

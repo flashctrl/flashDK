@@ -1,4 +1,4 @@
-# flashctrl-sdk — Clean-Room Charter & Rules of Engagement
+# flashDK — Clean-Room Charter & Rules of Engagement
 
 **License target:** Apache-2.0 (permissive). This SDK must remain freely usable by
 proprietary AND open clients. Every rule below exists to keep that license valid.

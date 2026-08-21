@@ -1,5 +1,5 @@
 [package]
-name = "flashctrl-core"
+name = "flashdk-core"
 description = "Vendor-neutral model for controlling IP-KVM devices. Clean-room, Apache-2.0."
 version.workspace = true
 edition.workspace = true
