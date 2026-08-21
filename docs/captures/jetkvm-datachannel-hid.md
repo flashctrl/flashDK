@@ -20,14 +20,16 @@ was generated. No vendor source read.
 - Observed: Esc down = `05 29 01`, Esc up = `05 29 00`.
 - Maps directly to flashdk_core::hid::KeyEvent { key, pressed }.
 
-### Mouse  — STRUCTURE SEEN, VALUES UNVERIFIED
-Initial zero-state frames only (device had "No HDMI signal", so the client emitted no
-movement frames — absolute positioning needs a visible screen):
-- `hidrpc` type 0x02, 8 bytes: `02 00 00 00 00 00 00 00`  (likely absolute mouse)
-- `hidrpc-unreliable-ordered` type 0x03, 10 bytes: `03 00 ...`  (likely relative/hi-rate)
-- `hidrpc` `0101` (2 bytes) and `09` (1 byte) also seen — role TBD (LED/keepalive/sync).
-Field layout must be confirmed with a signal-present capture on a NON-host target
-(JetKVM's USB HID drives whatever it's plugged into — during capture that was the dev host).
+### Mouse, absolute — VERIFIED (on `hidrpc-unreliable-ordered`, type 0x03, 10 bytes)
+`[0x03][buttons][X 24-bit BE (idx2..4)][pad idx5][Y 24-bit BE (idx6..8)][wheel idx9]`
+- X, Y: 0..32767 = fraction of the target screen (big-endian). Matches core AbsMouse.
+- buttons: bitmask at idx1 (bit0 left, etc.). wheel: signed at idx9.
+- Verified with calibrated hovers on a Proxmox console (1280x720):
+    fx0.90/fy0.50 -> `03 00 00 7308 00 00 4000 00` (X=29448, Y=16384)
+    fx0.11/fy1.00 -> `03 00 00 0e58 00 00 7fff 00` (X=3672, Y=32767)
+- `hidrpc` type 0x02 (8 bytes) stays zero during moves — likely the reliable/on-change
+  absolute report or button channel; `0101`/`09` are keepalive/sync. Relative-mouse
+  frame type not yet characterized (client used absolute).
 
 ## Transport note
 Implementing this adapter requires a Rust WebRTC stack (webrtc-rs, BSD/MIT — clean):
