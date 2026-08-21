@@ -1,0 +1,12 @@
+[package]
+name = "flashctrl-core"
+description = "Vendor-neutral model for controlling IP-KVM devices. Clean-room, Apache-2.0."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# No dependencies yet — on purpose. Zero deps means nothing to license-audit and
+# nothing to install before it compiles. When we add async networking we'll pull in
+# `tokio` (MIT) and an HTTP client; every dependency must be permissively licensed
+# per CLEANROOM.md.
+[dependencies]
