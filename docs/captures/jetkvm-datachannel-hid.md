@@ -33,3 +33,16 @@ Field layout must be confirmed with a signal-present capture on a NON-host targe
 Implementing this adapter requires a Rust WebRTC stack (webrtc-rs, BSD/MIT — clean):
 HTTP signaling at /webrtc/session, ICE/DTLS, then open the `hidrpc` DataChannel and send
 the binary frames above. This is the "PeerRpc" transport in flashdk_core.
+
+## System architecture (SSH-observed, system facts only — no source read)
+
+Device: Linux 5.10.160 armv7l (busybox). Observed via root SSH:
+- Process `jetkvm [app]` listens on :80 (web UI, control, WebRTC signaling).
+- Process `jetkvm [native]` listens on 127.0.0.1:3893 (local media/HID engine).
+- `dropbear` on :22.
+- Composite USB gadget 0x1d6b/0x0104: hid.usb0 (keyboard, 8B report),
+  hid.usb1 (mouse, 6B), hid.usb2 (mouse, 5B), hid.usb3 (1B consumer/control),
+  mass_storage.usb0, uac1.usb0 (audio).
+- The compact hidrpc keyboard event [0x05][usage][state] maps onto the 8B USB
+  keyboard report; mouse hidrpc frames (types 0x02/0x03) map onto the mouse HID
+  interfaces. hidrpc *wire* format comes from DataChannel capture, not from device source.
