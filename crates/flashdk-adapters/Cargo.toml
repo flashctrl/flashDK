@@ -14,6 +14,17 @@ reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# NanoKVM: WebSocket transport for its binary HID protocol, plus the RustCrypto
+# pieces to replicate its CryptoJS-compatible AES login (all permissive-licensed).
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+md-5 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+tokio = { version = "1", features = ["sync", "net"] }
+
 [dev-dependencies]
 # Only the runnable examples need an async runtime entrypoint; the library itself
 # stays runtime-agnostic (the app supplies the executor).
