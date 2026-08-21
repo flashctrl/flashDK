@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-flashdk-core = { path = "../flashdk-core" }
+flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 # HTTP client for REST-based devices (PiKVM, NanoKVM). All permissively licensed.
 # `json` pulls serde support; default TLS (native-tls) is fine on desktop — we'll
 # switch to rustls for mobile cross-compiles later, and add TOFU cert pinning then.
