@@ -48,3 +48,19 @@ Device: Linux 5.10.160 armv7l (busybox). Observed via root SSH:
 - The compact hidrpc keyboard event [0x05][usage][state] maps onto the 8B USB
   keyboard report; mouse hidrpc frames (types 0x02/0x03) map onto the mouse HID
   interfaces. hidrpc *wire* format comes from DataChannel capture, not from device source.
+
+## Signaling (probed — browser interception not possible)
+
+The web client captures window.fetch/WebSocket/RTCPeerConnection at bundle-eval time,
+so post-load hooks are bypassed; the device has no packet-capture tools; the dev host
+can't run tcpdump without sudo. So the exact signaling was inferred by black-box probing
+POST /webrtc/session (authenticated):
+- `{}` (application/json) -> {"error":{"Offset":0}}
+- `{"sd":"test"}`        -> {"error":{"Offset":1}}
+- a JSON *string* body (quoted base64) -> {"error":"Invalid request body"} (400)
+
+The Offset errors are Go json.Unmarshal-into-string failures: the body is expected to be
+a JSON string whose value is base64 (JetKVM's base64-wrapped SDP exchange). A well-formed
+body advances past parsing to content validation. Plan: webrtc-rs generates a real SDP
+offer; POST it base64-wrapped and iterate the exact wrapper against the live device
+(black-box) until it returns a valid answer. No device source consulted.
