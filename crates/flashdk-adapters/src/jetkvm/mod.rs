@@ -27,6 +27,8 @@ use transport::JetTransport;
 /// A connected JetKVM.
 pub struct JetKvm {
     host: String,
+    /// App version reported by the device at connect (via getLocalVersion).
+    firmware: String,
     transport: JetTransport,
     /// Last absolute cursor position, so a wheel-only event can re-send it (JetKVM's
     /// mouse frame is absolute and always carries a position).
@@ -55,8 +57,18 @@ impl JetKvm {
         }
 
         let transport = transport::connect(http, &host).await?;
+
+        // Best-effort: read the app version over the rpc channel for DeviceInfo.
+        let firmware = transport
+            .rpc_call("getLocalVersion", serde_json::json!({}))
+            .await
+            .ok()
+            .and_then(|v| v["appVersion"].as_str().map(str::to_string))
+            .unwrap_or_else(|| "unknown".to_string());
+
         Ok(Self {
             host,
+            firmware,
             transport,
             mouse: Mutex::new((0, 0)),
         })
@@ -82,7 +94,7 @@ impl Device for JetKvm {
         DeviceInfo {
             vendor: Vendor::JetKvm,
             model: "JetKVM".to_string(),
-            firmware: "unknown".to_string(),
+            firmware: self.firmware.clone(),
             hardened: false,
         }
     }
