@@ -10,7 +10,7 @@ flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 # HTTP client for REST-based devices (PiKVM, NanoKVM). All permissively licensed.
 # `json` pulls serde support; default TLS (native-tls) is fine on desktop — we'll
 # switch to rustls for mobile cross-compiles later, and add TOFU cert pinning then.
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "cookies"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -23,7 +23,7 @@ cbc = { version = "0.1", features = ["alloc"] }
 md-5 = "0.10"
 base64 = "0.22"
 rand = "0.8"
-tokio = { version = "1", features = ["sync", "net"] }
+tokio = { version = "1", features = ["sync", "net", "rt", "macros", "time"] }
 
 # JetKVM: sans-IO WebRTC (MIT) for its DataChannel HID transport. We drive the UDP
 # socket + timers ourselves; no ring/copyleft in the tree.
