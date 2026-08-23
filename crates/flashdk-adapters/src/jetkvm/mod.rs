@@ -66,6 +66,15 @@ impl JetKvm {
     pub fn host(&self) -> &str {
         &self.host
     }
+
+    /// Fetch the device's version info over the JSON-RPC `rpc` channel
+    /// (`getLocalVersion`) — a read-only control call, useful as a liveness check and
+    /// to populate firmware info later.
+    pub async fn local_version(&self) -> Result<serde_json::Value> {
+        self.transport
+            .rpc_call("getLocalVersion", serde_json::json!({}))
+            .await
+    }
 }
 
 impl Device for JetKvm {

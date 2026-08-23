@@ -32,6 +32,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         kvm.transport_kind()
     );
 
+    match kvm.local_version().await {
+        Ok(v) => println!("rpc getLocalVersion -> {v}"),
+        Err(e) => println!("rpc getLocalVersion failed: {e}"),
+    }
+
     println!("Moving mouse to center (16384,16384) on the target…");
     kvm.absolute_mouse(AbsMouse {
         x: 16384,

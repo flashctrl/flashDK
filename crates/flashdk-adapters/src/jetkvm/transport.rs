@@ -4,12 +4,12 @@
 //! works over a WebRTC peer connection. [`connect`] performs the full lifecycle —
 //! build an offer with the device's data channels, exchange SDP over
 //! `POST /webrtc/session`, then drive str0m's sans-IO loop on a background task over a
-//! UDP socket. It returns a [`JetTransport`] handle; HID frames are sent by posting
-//! commands to the driver, which writes them to the open channels.
+//! UDP socket. It returns a [`JetTransport`] handle: HID frames go over the binary
+//! `hidrpc*` channels, and control calls over the JSON-RPC `rpc` channel.
 
-#![allow(dead_code)] // wired into the adapter incrementally
-
+use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use flashdk_core::{Error, Result};
@@ -23,17 +23,25 @@ pub const CH_RPC: &str = "rpc";
 pub const CH_HID: &str = "hidrpc";
 pub const CH_HID_UNRELIABLE_ORDERED: &str = "hidrpc-unreliable-ordered";
 
-/// A command sent to the driver task: write `data` to a data channel.
+/// A command sent to the driver task.
 enum Cmd {
+    /// Write a binary HID frame to a data channel.
     Write { channel: ChannelId, data: Vec<u8> },
+    /// Issue a JSON-RPC request on the `rpc` channel, correlating the reply by `id`.
+    Rpc {
+        id: String,
+        request: Vec<u8>,
+        resp: oneshot::Sender<Result<serde_json::Value>>,
+    },
 }
 
-/// Handle to a live JetKVM WebRTC connection. Cloneable senders route HID frames to
-/// the background driver that owns the `Rtc`.
+/// Handle to a live JetKVM WebRTC connection. HID frames route to the binary channels;
+/// [`rpc_call`](JetTransport::rpc_call) issues control requests over the `rpc` channel.
 pub struct JetTransport {
     cmd_tx: mpsc::UnboundedSender<Cmd>,
     hid: ChannelId,
     hid_unreliable: ChannelId,
+    next_id: AtomicU64,
 }
 
 impl JetTransport {
@@ -56,13 +64,35 @@ impl JetTransport {
             })
             .map_err(|_| Error::Transport("jetkvm driver stopped".into()))
     }
+
+    /// Issue a JSON-RPC 2.0 request on the `rpc` channel and await the result.
+    pub async fn rpc_call(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let id = format!("flashdk-{}", self.next_id.fetch_add(1, Ordering::Relaxed));
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": id,
+        })
+        .to_string()
+        .into_bytes();
+        let (resp, rx) = oneshot::channel();
+        self.cmd_tx
+            .send(Cmd::Rpc { id, request, resp })
+            .map_err(|_| Error::Transport("jetkvm driver stopped".into()))?;
+        rx.await
+            .map_err(|_| Error::Transport("jetkvm driver dropped rpc".into()))?
+    }
 }
 
 /// Establish the WebRTC connection to `host` (already-authenticated `http` client for
 /// signaling), returning a handle once the `hidrpc` channel is open.
 pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> {
-    // 1) Bind the media socket and determine our routable local address (the source IP
-    //    the device will see) via a scratch connect to the host.
+    // 1) Bind the media socket and determine our routable local address.
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| Error::Transport(e.to_string()))?;
     socket
         .set_nonblocking(true)
@@ -76,7 +106,7 @@ pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> 
     rtc.add_local_candidate(candidate);
 
     let mut api = rtc.sdp_api();
-    let _rpc = api.add_channel(CH_RPC.to_string());
+    let rpc = api.add_channel(CH_RPC.to_string());
     let hid = api.add_channel(CH_HID.to_string());
     let hid_unreliable = api.add_channel(CH_HID_UNRELIABLE_ORDERED.to_string());
     let (offer, pending) = api
@@ -104,6 +134,7 @@ pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> 
         cmd_rx,
         Some(ready_tx),
         hid,
+        rpc,
     ));
 
     ready_rx
@@ -114,6 +145,7 @@ pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> 
         cmd_tx,
         hid,
         hid_unreliable,
+        next_id: AtomicU64::new(1),
     })
 }
 
@@ -135,7 +167,9 @@ fn routable_local_addr(host: &str, media: &UdpSocket) -> Result<SocketAddr> {
     Ok(SocketAddr::new(ip, port))
 }
 
-/// The sans-IO event loop: pump str0m's outputs, feed inbound datagrams and commands.
+/// The sans-IO event loop: pump str0m's outputs, feed inbound datagrams and commands,
+/// and correlate JSON-RPC replies on the `rpc` channel.
+#[allow(clippy::too_many_arguments)]
 async fn drive(
     mut rtc: Rtc,
     socket: tokio::net::UdpSocket,
@@ -143,8 +177,10 @@ async fn drive(
     mut cmd_rx: mpsc::UnboundedReceiver<Cmd>,
     mut ready_tx: Option<oneshot::Sender<Result<()>>>,
     hid: ChannelId,
+    rpc: ChannelId,
 ) {
     let mut buf = vec![0u8; 2048];
+    let mut pending: HashMap<String, oneshot::Sender<Result<serde_json::Value>>> = HashMap::new();
     loop {
         // Drain outputs until str0m asks us to wait.
         let timeout = loop {
@@ -154,12 +190,16 @@ async fn drive(
                     let _ = socket.send_to(&t.contents, t.destination).await;
                 }
                 Ok(Output::Event(ev)) => {
-                    if let Event::ChannelOpen(id, _label) = ev {
-                        if id == hid {
+                    match ev {
+                        Event::ChannelOpen(id, _label) if id == hid => {
                             if let Some(tx) = ready_tx.take() {
                                 let _ = tx.send(Ok(()));
                             }
                         }
+                        Event::ChannelData(cd) if cd.id == rpc => {
+                            dispatch_rpc(&cd.data, &mut pending);
+                        }
+                        _ => {}
                     }
                     if !rtc.is_alive() {
                         return;
@@ -174,8 +214,7 @@ async fn drive(
             }
         };
 
-        let now = Instant::now();
-        let wait = timeout.saturating_duration_since(now);
+        let wait = timeout.saturating_duration_since(Instant::now());
         tokio::select! {
             _ = tokio::time::sleep(wait) => {
                 let _ = rtc.handle_input(Input::Timeout(Instant::now()));
@@ -197,10 +236,43 @@ async fn drive(
                             let _ = ch.write(true, &data);
                         }
                     }
+                    Some(Cmd::Rpc { id, request, resp }) => {
+                        match rtc.channel(rpc) {
+                            Some(mut ch) => {
+                                pending.insert(id, resp);
+                                let _ = ch.write(false, &request); // JSON text
+                            }
+                            None => { let _ = resp.send(Err(Error::Transport("rpc channel not open".into()))); }
+                        }
+                    }
                     None => return, // handle dropped
                 }
             }
         }
+    }
+}
+
+/// Parse a JSON-RPC reply and fulfil the matching pending request.
+fn dispatch_rpc(
+    data: &[u8],
+    pending: &mut HashMap<String, oneshot::Sender<Result<serde_json::Value>>>,
+) {
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(data) else {
+        return;
+    };
+    // id may be a string or a number; normalise to string for correlation.
+    let id = match &v["id"] {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        _ => return,
+    };
+    if let Some(tx) = pending.remove(&id) {
+        let result = if v.get("error").is_some_and(|e| !e.is_null()) {
+            Err(Error::Protocol(format!("rpc error: {}", v["error"])))
+        } else {
+            Ok(v.get("result").cloned().unwrap_or(serde_json::Value::Null))
+        };
+        let _ = tx.send(result);
     }
 }
 
@@ -240,7 +312,6 @@ pub async fn exchange_sdp(
         )));
     }
 
-    // Response: {"sd": "<base64 of {type:answer, sdp:...}>"}.
     let outer: serde_json::Value =
         serde_json::from_str(&text).map_err(|e| Error::Protocol(e.to_string()))?;
     let sd = outer["sd"]

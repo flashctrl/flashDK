@@ -64,3 +64,10 @@ a JSON string whose value is base64 (JetKVM's base64-wrapped SDP exchange). A we
 body advances past parsing to content validation. Plan: webrtc-rs generates a real SDP
 offer; POST it base64-wrapped and iterate the exact wrapper against the live device
 (black-box) until it returns a valid answer. No device source consulted.
+
+## rpc control channel (JSON-RPC 2.0) — verified
+
+The `rpc` DataChannel carries JSON-RPC 2.0 (text). Request/response correlation by `id`
+works over str0m. Verified live: `getLocalVersion` (no params) ->
+`{"appVersion":"0.5.9-dev...","systemVersion":"0.2.8"}`. Power/virtual-media method
+names+shapes to be captured off this channel (wire) before wiring them.
