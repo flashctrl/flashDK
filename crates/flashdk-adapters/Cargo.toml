@@ -25,6 +25,10 @@ base64 = "0.22"
 rand = "0.8"
 tokio = { version = "1", features = ["sync", "net"] }
 
+# JetKVM: sans-IO WebRTC (MIT) for its DataChannel HID transport. We drive the UDP
+# socket + timers ourselves; no ring/copyleft in the tree.
+str0m = "0.6"
+
 [dev-dependencies]
 # Only the runnable examples need an async runtime entrypoint; the library itself
 # stays runtime-agnostic (the app supplies the executor).

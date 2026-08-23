@@ -10,6 +10,7 @@
 //! The WebRTC transport itself (webrtc-rs) is not wired yet; this adapter remains a
 //! stub until it lands. The wire encoders below are complete and unit-tested.
 
+mod transport;
 mod wire;
 
 use flashdk_core::capability::Vendor;
