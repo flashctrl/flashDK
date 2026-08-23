@@ -4,10 +4,9 @@
 //! real device. Every line here is derived from **wire observation and official docs
 //! only** — never from any vendor's source. See `CLEANROOM.md`.
 //!
-//! All three adapters below are **stubs**: they carry the right identity, capabilities,
-//! and transport shape (from our live probing) but every action returns
-//! `Error::NotImplemented`. That's the point of this first slice — agree on the shape
-//! before wiring behaviour. HID is the first thing we'll make real.
+//! Status: PiKVM and NanoKVM have live HID + power + virtual media; JetKVM has live HID
+//! over WebRTC (power/media over its JSON-RPC channel are pending). The [`Kvm`] enum
+//! below is the vendor-neutral entry point apps hold.
 
 #![allow(async_fn_in_trait)]
 
@@ -115,6 +114,33 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.list().await,
             Kvm::PiKvm(a) => a.list().await,
             Kvm::JetKvm(a) => a.list().await,
+        }
+    }
+
+    /// Mount a virtual-media image by name.
+    pub async fn media_mount(&self, name: &str) -> Result<()> {
+        match self {
+            Kvm::NanoKvm(a) => a.mount(name).await,
+            Kvm::PiKvm(a) => a.mount(name).await,
+            Kvm::JetKvm(a) => a.mount(name).await,
+        }
+    }
+
+    /// Unmount whatever virtual media is currently presented.
+    pub async fn media_unmount(&self) -> Result<()> {
+        match self {
+            Kvm::NanoKvm(a) => a.unmount().await,
+            Kvm::PiKvm(a) => a.unmount().await,
+            Kvm::JetKvm(a) => a.unmount().await,
+        }
+    }
+
+    /// Type a string as key events (US layout; see [`flashdk_core::hid::Hid::paste_text`]).
+    pub async fn paste_text(&self, text: &str) -> Result<()> {
+        match self {
+            Kvm::NanoKvm(a) => a.paste_text(text).await,
+            Kvm::PiKvm(a) => a.paste_text(text).await,
+            Kvm::JetKvm(a) => a.paste_text(text).await,
         }
     }
 }
