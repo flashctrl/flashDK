@@ -1,9 +1,16 @@
-//! JetKVM adapter — control is JSON-RPC over a WebRTC DataChannel.
+//! JetKVM adapter — control rides WebRTC DataChannels ([`TransportKind::PeerRpc`]).
 //!
-//! The odd one out: [`TransportKind::PeerRpc`] means we must negotiate a WebRTC peer
-//! connection (signaling at `/webrtc/session`) before *any* control, including a single
-//! keystroke. Observed live on 10.0.10.21. RPC method names (e.g. `keyboardReport`,
-//! `setATXPowerAction`) were read off the wire/frontend, not from source.
+//! The odd one out: a WebRTC peer connection (signaling at `/webrtc/session`) must be
+//! negotiated before *any* control. JetKVM then splits functions across channels: a
+//! `rpc` channel carries JSON-RPC 2.0 for control (video/EDID/power/etc.), while HID
+//! rides separate **binary** `hidrpc*` channels. The HID frame formats are decoded in
+//! the `wire` module from DataChannel captures (see
+//! docs/captures/jetkvm-datachannel-hid.md), never from device source.
+//!
+//! The WebRTC transport itself (webrtc-rs) is not wired yet; this adapter remains a
+//! stub until it lands. The wire encoders below are complete and unit-tested.
+
+mod wire;
 
 use flashdk_core::capability::Vendor;
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
