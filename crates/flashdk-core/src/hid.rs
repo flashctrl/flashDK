@@ -16,6 +16,63 @@ use crate::error::Result;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeyCode(pub u8);
 
+/// Left Shift modifier usage id — used to type shifted characters.
+pub const LEFT_SHIFT: KeyCode = KeyCode(0xE1);
+
+/// Map a character to its US-layout HID usage id and whether Shift is required.
+///
+/// Uses the USB HID Usage Tables (page 0x07) and the US ANSI keyboard layout — both
+/// public standards, so this stays clean-room. Returns `None` for characters not
+/// reachable on a US layout (callers typing text should skip those).
+pub fn char_to_hid(c: char) -> Option<(KeyCode, bool)> {
+    let (usage, shift): (u8, bool) = match c {
+        'a'..='z' => (0x04 + (c as u8 - b'a'), false),
+        'A'..='Z' => (0x04 + (c as u8 - b'A'), true),
+        '1'..='9' => (0x1E + (c as u8 - b'1'), false),
+        '0' => (0x27, false),
+        // Shifted number row (US).
+        '!' => (0x1E, true),
+        '@' => (0x1F, true),
+        '#' => (0x20, true),
+        '$' => (0x21, true),
+        '%' => (0x22, true),
+        '^' => (0x23, true),
+        '&' => (0x24, true),
+        '*' => (0x25, true),
+        '(' => (0x26, true),
+        ')' => (0x27, true),
+        // Whitespace / control.
+        ' ' => (0x2C, false),
+        '\n' => (0x28, false), // Enter
+        '\t' => (0x2B, false), // Tab
+        // Punctuation and their shifted pairs.
+        '-' => (0x2D, false),
+        '_' => (0x2D, true),
+        '=' => (0x2E, false),
+        '+' => (0x2E, true),
+        '[' => (0x2F, false),
+        '{' => (0x2F, true),
+        ']' => (0x30, false),
+        '}' => (0x30, true),
+        '\\' => (0x31, false),
+        '|' => (0x31, true),
+        ';' => (0x33, false),
+        ':' => (0x33, true),
+        '\'' => (0x34, false),
+        '"' => (0x34, true),
+        '`' => (0x35, false),
+        '~' => (0x35, true),
+        ',' => (0x36, false),
+        '<' => (0x36, true),
+        '.' => (0x37, false),
+        '>' => (0x37, true),
+        '/' => (0x38, false),
+        '?' => (0x38, true),
+        _ => return None,
+    };
+    Some((KeyCode(usage), shift))
+}
+
 /// One key going down or coming up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeyEvent {
@@ -76,10 +133,63 @@ pub trait Hid {
     /// Scroll.
     async fn wheel(&self, w: Wheel) -> Result<()>;
 
-    /// Convenience: type a whole string. The default implementation is intentionally
-    /// left for adapters/helpers to fill — turning text into keycodes is layout-
-    /// dependent and worth doing once, carefully, in shared code later.
-    async fn paste_text(&self, _text: &str) -> Result<()> {
-        Err(crate::error::Error::NotImplemented)
+    /// Convenience: type a whole string as individual key events (US layout).
+    ///
+    /// The default drives [`key`](Hid::key) per character via [`char_to_hid`], so every
+    /// adapter gets working paste for free. Characters not reachable on a US layout are
+    /// skipped (best-effort). Adapters with a native bulk-paste endpoint may override
+    /// this for efficiency.
+    async fn paste_text(&self, text: &str) -> Result<()> {
+        for ch in text.chars() {
+            let Some((code, shift)) = char_to_hid(ch) else {
+                continue; // skip characters we can't type on a US layout
+            };
+            if shift {
+                self.key(KeyEvent {
+                    key: LEFT_SHIFT,
+                    pressed: true,
+                })
+                .await?;
+            }
+            self.key(KeyEvent {
+                key: code,
+                pressed: true,
+            })
+            .await?;
+            self.key(KeyEvent {
+                key: code,
+                pressed: false,
+            })
+            .await?;
+            if shift {
+                self.key(KeyEvent {
+                    key: LEFT_SHIFT,
+                    pressed: false,
+                })
+                .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn us_layout_mapping() {
+        assert_eq!(char_to_hid('a'), Some((KeyCode(0x04), false)));
+        assert_eq!(char_to_hid('A'), Some((KeyCode(0x04), true)));
+        assert_eq!(char_to_hid('z'), Some((KeyCode(0x1D), false)));
+        assert_eq!(char_to_hid('1'), Some((KeyCode(0x1E), false)));
+        assert_eq!(char_to_hid('0'), Some((KeyCode(0x27), false)));
+        assert_eq!(char_to_hid('!'), Some((KeyCode(0x1E), true)));
+        assert_eq!(char_to_hid(')'), Some((KeyCode(0x27), true)));
+        assert_eq!(char_to_hid(' '), Some((KeyCode(0x2C), false)));
+        assert_eq!(char_to_hid('\n'), Some((KeyCode(0x28), false)));
+        assert_eq!(char_to_hid('?'), Some((KeyCode(0x38), true)));
+        assert_eq!(char_to_hid('_'), Some((KeyCode(0x2D), true)));
+        assert_eq!(char_to_hid('€'), None); // not on US layout
     }
 }
