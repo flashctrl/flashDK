@@ -32,7 +32,14 @@ allow = [
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []  # add specific RUSTSEC IDs here only with a written justification
+# Ignore specific advisories only with a written justification. Vulnerabilities are
+# never ignored here; entries below are non-vulnerability (unmaintained) notices in
+# transitive deps we don't control and that have no safe upgrade available.
+ignore = [
+    # fxhash: unmaintained (not vulnerable), pulled via str0m -> sctp-proto. No safe
+    # upgrade exists upstream. Revisit if/when str0m migrates off it.
+    "RUSTSEC-2025-0057",
+]
 
 # --- Dependency bans: no wildcard version requirements (supply-chain hygiene).
 # Our own workspace path deps are exempt via allow-wildcard-paths. ---
