@@ -1,4 +1,4 @@
-# Provenance — jetkvm adapter
+# Provenance: jetkvm adapter
 
 Per CLEANROOM.md, this adapter is implemented from **wire observation and official
 documentation only**. No source code from any third-party project or SDK was read or copied.

@@ -1,4 +1,4 @@
-# Capture — PiKVM HID REST contract (wire-observed)
+# Capture: PiKVM HID REST contract (wire-observed)
 
 Device: PiKVM v3, kvmd 4.206, https://10.0.10.20 (self-signed TLS)
 Auth: header `X-KVMD-User` / `X-KVMD-Passwd`

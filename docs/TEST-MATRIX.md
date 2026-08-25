@@ -4,7 +4,7 @@ Each vendor adapter must be exercised across the configuration dimensions below,
 just the happy path. Many of these change the wire protocol or capability set, so they
 need real-device verification per platform (NanoKVM, PiKVM, JetKVM, GL.iNet).
 
-Status legend: ✅ verified · 🔶 partial/observed · ⬜ not yet tested · — n/a
+Status legend: ✅ verified · 🔶 partial/observed · ⬜ not yet tested
 
 | Dimension | Why it matters | NanoKVM | PiKVM | JetKVM | GL.iNet |
 |-----------|----------------|---------|-------|--------|---------|
@@ -25,6 +25,6 @@ Status legend: ✅ verified · 🔶 partial/observed · ⬜ not yet tested · �
   matrix cells: they most often shift the wire protocol, so each combination wants a
   capture, not an assumption.
 - **Text pasting** is layout-dependent (usage-code translation); test multiple layouts.
-- **Video codec** and **wake/reset** paths should be probed per firmware version — these
-  vendors ship breaking changes (esp. JetKVM, NanoKVM).
+- **Video codec** and **wake/reset** paths should be probed per firmware version, since
+  these vendors ship breaking changes (especially JetKVM and NanoKVM).
 - Fill cells only from real-device verification (clean-room), never from vendor source.

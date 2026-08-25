@@ -1,10 +1,10 @@
-# flashDK — Cargo workspace root.
+# flashDK: Cargo workspace root.
 # A "workspace" lets several related crates (Rust packages) live in one repo and
 # build together. We have two so far:
-#   * flashdk-core     — the vendor-neutral model (traits, types). Knows nothing
-#                          about any specific device.
-#   * flashdk-adapters — one module per KVM vendor, each teaching flashdk-core's
-#                          traits how to talk to that device.
+#   * flashdk-core: the vendor-neutral model (traits, types). Knows nothing
+#                    about any specific device.
+#   * flashdk-adapters: one module per KVM vendor, each teaching flashdk-core's
+#                        traits how to talk to that device.
 # The native apps (and any third-party client) depend on these, plus a thin UniFFI
 # layer we add later to generate Swift/Kotlin bindings.
 
