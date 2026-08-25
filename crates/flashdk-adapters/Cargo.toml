@@ -7,12 +7,27 @@ license.workspace = true
 
 [dependencies]
 flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
-# HTTP client for REST-based devices (PiKVM, NanoKVM). All permissively licensed.
-# `json` pulls serde support; default TLS (native-tls) is fine on desktop — we'll
-# switch to rustls for mobile cross-compiles later, and add TOFU cert pinning then.
-reqwest = { version = "0.12", features = ["json", "cookies"] }
+# HTTP client for REST-based devices (PiKVM, NanoKVM, JetKVM signaling). All
+# permissively licensed. `default-features = false` drops native-tls/OpenSSL
+# entirely — NanoKVM/JetKVM only ever speak plain http://, and PiKVM's HTTPS goes
+# through our own rustls config (see tls_pin.rs) for TOFU cert pinning, so a single
+# rustls stack is all this crate needs (simpler license/audit surface, and no
+# OpenSSL to cross-compile for mobile later).
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "cookies",
+    "rustls-tls-manual-roots-no-provider",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# TLS for PiKVM's TOFU certificate pinning (tls_pin.rs). aws_lc_rs is the crypto
+# provider — NOT ring, to keep the dependency tree consistent with the WebRTC choice
+# below (ring's non-standard license complicates the compliance gate). aws-lc-sys's
+# license is a compound OR/AND of Apache-2.0/ISC/MIT/BSD-3-Clause, all on our allow
+# list (deny.toml).
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
+sha2 = "0.10"
 
 # NanoKVM: WebSocket transport for its binary HID protocol, plus the RustCrypto
 # pieces to replicate its CryptoJS-compatible AES login (all permissive-licensed).

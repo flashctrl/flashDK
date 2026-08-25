@@ -13,6 +13,7 @@
 pub mod jetkvm;
 pub mod nanokvm;
 pub mod pikvm;
+pub mod tls_pin;
 
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};

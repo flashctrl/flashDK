@@ -7,12 +7,16 @@
 
 mod keymap;
 
+use std::sync::Arc;
+
 use flashdk_core::capability::Vendor;
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};
 use flashdk_core::power::{Power, PowerAction, PowerState};
 use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
 use reqwest::RequestBuilder;
+
+use crate::tls_pin::{self, MemoryPinStore, PinStore};
 
 /// kvmd's uniform reply shape: `{"ok": bool, "result": {...}}`.
 #[derive(serde::Deserialize)]
@@ -33,20 +37,32 @@ pub struct PiKvm {
 impl PiKvm {
     /// Point an adapter at `host` (e.g. "10.0.10.20") with kvmd credentials.
     ///
-    /// We currently accept the device's self-signed certificate. That's a deliberate
-    /// stopgap: the real plan (see `Capabilities::tls_pinnable`) is trust-on-first-use
-    /// pinning of PiKVM's certificate. Until that lands, treat this as LAN-only.
+    /// PiKVM ships a self-signed certificate, so ordinary CA-chain validation can
+    /// never succeed. Rather than disabling certificate checking outright (which
+    /// would accept *any* certificate from *anyone*), this pins the certificate seen
+    /// on first connect and rejects a *different* one later — see [`crate::tls_pin`].
+    /// Pins are kept in memory for this instance; call [`Self::with_pin_store`] to
+    /// supply persistent storage (Keychain/Keystore) so a pin survives restarts.
     pub fn new(
         host: impl Into<String>,
         user: impl Into<String>,
         passwd: impl Into<String>,
     ) -> Result<Self> {
-        let http = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true) // TODO: replace with TOFU cert pinning
-            .build()
-            .map_err(|e| Error::Transport(e.to_string()))?;
+        Self::with_pin_store(host, user, passwd, Arc::new(MemoryPinStore::default()))
+    }
+
+    /// Like [`Self::new`], but pins are read from and written to `store` — supply a
+    /// persistent implementation to remember a device across app restarts.
+    pub fn with_pin_store(
+        host: impl Into<String>,
+        user: impl Into<String>,
+        passwd: impl Into<String>,
+        store: Arc<dyn PinStore>,
+    ) -> Result<Self> {
+        let host = host.into();
+        let http = tls_pin::tofu_client(&host, store).map_err(Error::Transport)?;
         Ok(Self {
-            base_url: format!("https://{}", host.into()),
+            base_url: format!("https://{host}"),
             user: user.into(),
             passwd: passwd.into(),
             http,
