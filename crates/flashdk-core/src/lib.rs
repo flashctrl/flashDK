@@ -18,6 +18,14 @@
 //!   [`transport::TransportKind`] instead of pretending it away.
 //!
 //! A new learner's reading order: `capability` → `transport` → `hid` → `device`.
+//!
+//! ## Beyond KVMs: `outlet` and `ups`
+//!
+//! [`outlet`] and [`ups`] cover a different device class (networked PDUs and UPS
+//! units) that shares the capability-based design but not the [`Device`] umbrella
+//! trait: those devices have no keyboard, mouse, or video, so forcing them through
+//! `Hid`/`Power`/`VirtualMedia` would mean every method returning `NotSupported`.
+//! See either module's doc comment for the reasoning.
 
 // Native `async fn` in traits is stable, but the compiler warns when they appear in
 // *public* traits (it wants you to think about auto-trait bounds on the returned
@@ -29,8 +37,10 @@ pub mod device;
 pub mod error;
 pub mod hid;
 pub mod media;
+pub mod outlet;
 pub mod power;
 pub mod transport;
+pub mod ups;
 
 // Re-export the handful of types callers reach for most, so app code can write
 // `use flashdk_core::{Kvm, Vendor, Result};` without spelunking submodules.
