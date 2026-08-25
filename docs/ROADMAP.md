@@ -41,3 +41,36 @@ construction (implementing published specs, not reverse-engineering firmware).
 Land GL.iNet first (closes the hobbyist set), then a `redfish` adapter (iDRAC + iLO
 power/media/serial — high value, standards-based, quick), then AMT, then the
 proprietary graphical consoles as a later push.
+
+## Planned: power infrastructure (PDU / UPS)
+
+A third device class beyond KVMs and BMCs — no HID/video, but they slot into a
+capability-based model (outlet control + power monitoring). This nudges flashDK's
+identity toward "controllable infrastructure," not just KVMs.
+
+### Ubiquiti UniFi PDU (e.g. USP-PDU / PDU Pro) — user has one
+- Controlled via the **UniFi Network controller API** (self-hosted controller or a
+  UniFi OS console — Dream Machine / Cloud Key). Modern UniFi OS (4.x) exposes a local
+  **API-key** REST API; outlet on/off/cycle is done through device management
+  (per-outlet overrides). Older path: controller session login + `rest/device` PATCH.
+- Fits a `PowerOutlet` capability (enumerate outlets, on/off/cycle, read per-outlet
+  metering on metered models).
+- Clean-room: UniFi's API is documented (official API keys + community references);
+  implement to the documented REST surface. TLS-pinnable.
+
+### APC Back-UPS 1500 (BX/BN1500) — user has one
+- **Consumer UPS: USB only, no network port.** Not directly network-controllable.
+  Reached via a host running **NUT (Network UPS Tools, `upsd` on TCP 3493)** or
+  **apcupsd** (NIS on 3551) with the UPS on USB.
+- Capabilities are monitoring-first: charge %, load, line/on-battery status, runtime
+  estimate. Control is limited by the hardware — NUT `instcmd` can do things like
+  beeper mute and self-test; Back-UPS lacks switched outlets, so no per-outlet control.
+- Clean-room: NUT's network protocol is an open, documented standard — implement to spec.
+- Note: for switchable/networked UPS control, an APC **Smart-UPS + Network Management
+  Card** (SNMP/Redfish) is the upgrade path; the Back-UPS is monitor + limited commands.
+
+### Core implication
+Add capability traits for `PowerOutlet` (multi-outlet on/off/cycle, metering) and
+`UpsStatus` (read-only telemetry + limited commands). The existing `Power` trait covers
+whole-machine ATX; outlets and UPS telemetry are new, additive capabilities behind
+flags — keeping the single capability-negotiated model across KVMs, BMCs, PDUs, and UPS.
