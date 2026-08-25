@@ -91,6 +91,15 @@ switchable, networked UPS control, an APC Smart-UPS with a Network Management
 Card (SNMP or Redfish) is the upgrade path; the Back-UPS itself stays
 monitor-plus-limited-commands.
 
+A NUT client (`flashdk_adapters::nut`) implementing `UpsStatus` already exists,
+built directly from IETF RFC 9271 (the published NUT network protocol) and NUT's
+official manual pages, not from NUT's own source. It compiles and its protocol
+encoder/parser are unit-tested against the RFC's own example text, but the
+end-to-end TCP client has not been exercised against a running `upsd` or a real
+UPS: this project doesn't have either on hand yet. See
+`crates/flashdk-adapters/src/nut/PROVENANCE.md` and
+[STATE.md](STATE.md) for what's confirmed versus corroborated.
+
 ### What this implies for core
 
 Two new capability traits: `PowerOutlet` (enumerate, switch, and meter multiple
