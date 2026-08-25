@@ -14,11 +14,15 @@ jobs:
     name: build, lint & docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Deliberately not pinned to a commit: this action's whole purpose is to track
+      # whatever Rust currently calls "stable," and pinning it would defeat that. See
+      # docs/decisions.md for the reasoning; this is a named exception, not an
+      # oversight.
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Format
         run: cargo fmt --all --check
       - name: Clippy (warnings are errors)
@@ -34,13 +38,13 @@ jobs:
     name: license, supply-chain & clean-room
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # Licenses + security advisories + dependency bans + source integrity.
-      # The machine-enforced half of CLEANROOM.md — a copyleft or unknown-source
+      # Licenses, security advisories, dependency bans, and source integrity: the
+      # machine-enforced half of CLEANROOM.md. A copyleft or unknown-source
       # dependency fails the build.
       - name: cargo-deny (licenses, advisories, bans, sources)
-        uses: EmbarkStudios/cargo-deny-action@v2
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check licenses advisories bans sources
 
@@ -52,7 +56,7 @@ jobs:
           fail=0
           for d in crates/flashdk-adapters/src/*/; do
             if [ ! -f "${d}PROVENANCE.md" ]; then
-              echo "::error::Missing PROVENANCE.md in ${d} — clean-room rule (see CLEANROOM.md)"
+              echo "::error::Missing PROVENANCE.md in ${d}, required by CLEANROOM.md"
               fail=1
             fi
           done
@@ -60,12 +64,12 @@ jobs:
           exit $fail
 
       # Trademark hygiene: vendor marks may be used nominatively in prose, never in
-      # package identity/branding. Keeps us clear of trademark claims.
+      # package identity or branding. Keeps this project clear of trademark claims.
       - name: No vendor trademark in package identity
         shell: bash
         run: |
           if grep -rniE '^\s*name\s*=\s*".*(pikvm|nanokvm|jetkvm|sipeed|gl-?inet)' --include=Cargo.toml .; then
-            echo "::error::Vendor trademark found in a package name — keep marks nominative, not in identity"
+            echo "::error::Vendor trademark found in a package name, keep marks nominative, not in identity"
             exit 1
           fi
           echo "Package identity is trademark-clean."

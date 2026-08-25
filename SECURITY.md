@@ -10,10 +10,11 @@ We aim to acknowledge reports within a few days.
 ## Scope
 
 flashDK is a client library. It talks to IP-KVM devices over the network using each
-device's own protocol. Note that transport security depends on the device: some (e.g.
-PiKVM) offer TLS the client can pin; others serve cleartext HTTP on the LAN. flashDK
-surfaces each device's real security posture rather than masking it — see the
-`tls_pinnable` capability.
+device's own protocol. Transport security depends on the device: some (PiKVM) offer
+TLS the client can pin, others serve cleartext HTTP on the LAN. flashDK surfaces each
+device's real security posture rather than masking it, via the `tls_pinnable`
+capability. See [docs/security.md](docs/security.md) for the full trust model; this
+file covers only how to report a vulnerability.
 
 ## Supply chain
 

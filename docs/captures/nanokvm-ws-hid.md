@@ -1,18 +1,18 @@
-# Capture — NanoKVM /api/ws binary HID protocol (wire-observed)
+# Capture: NanoKVM /api/ws binary HID protocol (wire-observed)
 
 Device: NanoKVM PCIe, app 2.5.0, 10.0.10.10. WebSocket: `ws://<host>/api/ws`
 (also available over wss/443). Auth: `nano-kvm-token` cookie (JWT from AES login).
 
 Method: a generic `WebSocket.send` hook installed in the browser recorded the exact
 bytes the official web client sends, while real (trusted) pointer/keyboard input was
-generated. No vendor source was read — only the frames on the wire.
+generated. No vendor source was read: only the frames on the wire.
 
 ## Frame types (client -> server)
 
 ### Heartbeat
 `00`  (single byte, ~every 10s)
 
-### Keyboard  (9 bytes) — standard USB HID keyboard report with a 1-byte type prefix
+### Keyboard  (9 bytes): standard USB HID keyboard report with a 1-byte type prefix
 `[0x01][modifiers][0x00][k1][k2][k3][k4][k5][k6]`
 - modifiers: USB HID modifier bitmask (bit0 LCtrl,1 LShift,2 LAlt,3 LGUI,4 RCtrl,5 RShift,6 RAlt,7 RGUI)
 - k1..k6: up to six simultaneous USB HID usage codes (0x00 = empty)
@@ -31,7 +31,7 @@ generated. No vendor source was read — only the frames on the wire.
 Note: only absolute mouse (type 0x02) was observed. A relative-mouse frame type, if any,
 is not yet characterized.
 
-## REST endpoints (aux HID, power, storage) — observed contracts
+## REST endpoints (aux HID, power, storage): observed contracts
 
 - GET  /api/vm/gpio                 -> {pwr, hdd}  (power/activity state)
 - POST /api/vm/gpio {type, duration} -> hold power/reset line for `duration` ms.

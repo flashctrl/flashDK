@@ -9,7 +9,7 @@ license.workspace = true
 flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 # HTTP client for REST-based devices (PiKVM, NanoKVM, JetKVM signaling). All
 # permissively licensed. `default-features = false` drops native-tls/OpenSSL
-# entirely — NanoKVM/JetKVM only ever speak plain http://, and PiKVM's HTTPS goes
+# entirely. NanoKVM/JetKVM only ever speak plain http://, and PiKVM's HTTPS goes
 # through our own rustls config (see tls_pin.rs) for TOFU cert pinning, so a single
 # rustls stack is all this crate needs (simpler license/audit surface, and no
 # OpenSSL to cross-compile for mobile later).
@@ -22,7 +22,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # TLS for PiKVM's TOFU certificate pinning (tls_pin.rs). aws_lc_rs is the crypto
-# provider — NOT ring, to keep the dependency tree consistent with the WebRTC choice
+# provider, not ring, to keep the dependency tree consistent with the WebRTC choice
 # below (ring's non-standard license complicates the compliance gate). aws-lc-sys's
 # license is a compound OR/AND of Apache-2.0/ISC/MIT/BSD-3-Clause, all on our allow
 # list (deny.toml).

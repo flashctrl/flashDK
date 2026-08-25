@@ -1,5 +1,8 @@
 /target
 **/*.rs.bk
-Cargo.lock
 docs/captures/*.raw
 .DS_Store
+
+# Cargo.lock is committed deliberately: this workspace ships example binaries
+# built and run directly (not just a published library), so a pinned lockfile
+# gives reproducible builds. See docs/decisions.md #8.
