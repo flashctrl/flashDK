@@ -1,6 +1,6 @@
 //! Read-only proof-of-life for the PiKVM adapter: connect, then print capabilities,
 //! power state, and available virtual-media images. Sends NO input and triggers no
-//! power action — safe regardless of whether an ATX controller is attached.
+//! power action, safe regardless of whether an ATX controller is attached.
 //!
 //! ```bash
 //! PIKVM_HOST=10.0.10.20 PIKVM_USER=admin PIKVM_PASS='...' \

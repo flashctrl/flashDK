@@ -1,7 +1,7 @@
 //! JetKVM WebRTC transport (sans-IO via str0m).
 //!
 //! JetKVM speaks [`TransportKind::PeerRpc`](flashdk_core::TransportKind): control only
-//! works over a WebRTC peer connection. [`connect`] performs the full lifecycle —
+//! works over a WebRTC peer connection. [`connect`] performs the full lifecycle:
 //! build an offer with the device's data channels, exchange SDP over
 //! `POST /webrtc/session`, then drive str0m's sans-IO loop on a background task over a
 //! UDP socket. It returns a [`JetTransport`] handle: HID frames go over the binary
@@ -280,7 +280,7 @@ fn dispatch_rpc(
 ///
 /// JetKVM's `POST /webrtc/session` body is a JSON object `{"sd": "<base64>"}` where the
 /// base64 decodes to a JSON session description `{"type","sdp"}`; the reply is the same
-/// shape carrying the answer. (Established by probing + live iteration — see
+/// shape carrying the answer. (Established by probing plus live iteration; see
 /// docs/captures/jetkvm-datachannel-hid.md.)
 pub async fn exchange_sdp(
     http: &reqwest::Client,

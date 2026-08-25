@@ -2,7 +2,7 @@
 //!
 //! One module per vendor, each teaching `flashdk-core`'s traits how to speak to a
 //! real device. Every line here is derived from **wire observation and official docs
-//! only** — never from any vendor's source. See `CLEANROOM.md`.
+//! only**, never from any vendor's source. See `CLEANROOM.md`.
 //!
 //! Status: PiKVM and NanoKVM have live HID + power + virtual media; JetKVM has live HID
 //! over WebRTC (power/media over its JSON-RPC channel are pending). The [`Kvm`] enum
@@ -22,7 +22,7 @@ use flashdk_core::{Capabilities, Device, DeviceInfo, Result, TransportKind};
 
 /// Runtime polymorphism across vendors without `dyn`. The app holds a `Kvm` and calls
 /// methods on it; each call fans out to the concrete adapter inside. Adding a vendor
-/// means adding a variant and four `match` arms — the compiler makes sure you don't
+/// means adding a variant and four `match` arms; the compiler makes sure you don't
 /// forget one.
 pub enum Kvm {
     NanoKvm(nanokvm::NanoKvm),
@@ -31,7 +31,7 @@ pub enum Kvm {
 }
 
 impl Kvm {
-    /// Static identity — no network call.
+    /// Static identity, no network call.
     pub fn info(&self) -> DeviceInfo {
         match self {
             Kvm::NanoKvm(a) => a.info(),
@@ -49,7 +49,7 @@ impl Kvm {
         }
     }
 
-    /// Transport shape — check before enabling controls (JetKVM needs WebRTC first).
+    /// Transport shape: check before enabling controls (JetKVM needs WebRTC first).
     pub fn transport_kind(&self) -> TransportKind {
         match self {
             Kvm::NanoKvm(a) => a.transport_kind(),

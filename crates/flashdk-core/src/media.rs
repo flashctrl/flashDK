@@ -1,5 +1,5 @@
 //! Virtual media: present an ISO/image to the target as a USB drive or CD-ROM.
-//! Unifies cleanly — every device models it as list / mount / unmount plus state.
+//! Unifies cleanly: every device models it as list, mount, unmount, plus state.
 
 use crate::error::Result;
 

@@ -2,7 +2,7 @@
 //!
 //! Rust functions that can fail return `Result<T, Error>`. We alias that to
 //! [`Result<T>`] so signatures stay short. Every variant below is something a *caller*
-//! (the app) might want to react to differently — e.g. show a re-login prompt on
+//! (the app) might want to react to differently, e.g. show a re-login prompt on
 //! [`Error::Auth`], or grey out a button on [`Error::NotSupported`].
 
 use std::fmt;
@@ -18,9 +18,9 @@ pub enum Error {
     NotSupported(&'static str),
     /// We haven't written this code path yet. Every adapter stub returns this today.
     NotImplemented,
-    /// Login/session problem — credentials rejected, token expired, etc.
+    /// Login/session problem: credentials rejected, token expired, etc.
     Auth(String),
-    /// Network/transport failure — unreachable host, TLS problem, dropped socket.
+    /// Network/transport failure: unreachable host, TLS problem, dropped socket.
     Transport(String),
     /// The device answered, but not in a shape we understood.
     Protocol(String),

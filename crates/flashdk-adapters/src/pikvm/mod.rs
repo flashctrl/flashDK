@@ -1,7 +1,7 @@
-//! PiKVM v3 adapter — REST + WebSocket over real TLS (HSTS, self-signed CN=localhost).
+//! PiKVM v3 adapter: REST plus WebSocket over real TLS (HSTS, self-signed CN=localhost).
 //!
 //! Derived from wire observation of kvmd 4.206 and PiKVM's official API docs (see
-//! PROVENANCE.md and docs/captures/pikvm-hid-rest.md) — never from source. HID uses
+//! PROVENANCE.md and docs/captures/pikvm-hid-rest.md), never from source. HID uses
 //! the `/api/hid/events/` endpoints; power uses `/api/atx`; virtual media `/api/msd`.
 //! Auth is the header scheme (`X-KVMD-User` / `X-KVMD-Passwd`) on every request.
 
@@ -45,7 +45,7 @@ impl PiKvm {
     /// PiKVM ships a self-signed certificate, so ordinary CA-chain validation can
     /// never succeed. Rather than disabling certificate checking outright (which
     /// would accept *any* certificate from *anyone*), this pins the certificate seen
-    /// on first connect and rejects a *different* one later — see [`crate::tls_pin`].
+    /// on first connect and rejects a *different* one later; see [`crate::tls_pin`].
     /// Pins are kept in memory for this instance; call [`Self::with_pin_store`] to
     /// supply persistent storage (Keychain/Keystore) so a pin survives restarts.
     pub fn new(
@@ -56,7 +56,7 @@ impl PiKvm {
         Self::with_pin_store(host, user, passwd, Arc::new(MemoryPinStore::default()))
     }
 
-    /// Like [`Self::new`], but pins are read from and written to `store` — supply a
+    /// Like [`Self::new`], but pins are read from and written to `store`: supply a
     /// persistent implementation to remember a device across app restarts.
     pub fn with_pin_store(
         host: impl Into<String>,
@@ -144,7 +144,7 @@ impl PiKvm {
     }
 
     /// Reconcile the three mouse buttons to a bitmask (bit0 left, bit1 right, bit2 middle).
-    /// Stateless for now — a later WebSocket path will diff and only send changes.
+    /// Stateless for now; a later WebSocket path will diff and only send changes.
     async fn sync_buttons(&self, mask: u8) -> Result<()> {
         for (bit, name) in [(0u8, "left"), (1, "right"), (2, "middle")] {
             let state = if mask & (1u8 << bit) != 0 {

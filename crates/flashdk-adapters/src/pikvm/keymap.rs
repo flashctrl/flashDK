@@ -1,7 +1,7 @@
 //! Translate a USB HID keyboard **usage ID** (what `flashdk-core::hid::KeyCode`
 //! carries) into the **W3C `KeyboardEvent.code`** string kvmd expects (e.g. "KeyA").
 //!
-//! Both sides are public standards — USB HID Usage Tables (Usage Page 0x07) and the
+//! Both sides are public standards: USB HID Usage Tables (Usage Page 0x07) and the
 //! W3C UI Events `code` values. We map between two open specs; no vendor source is
 //! involved. Coverage here is the common subset; extend as needed.
 

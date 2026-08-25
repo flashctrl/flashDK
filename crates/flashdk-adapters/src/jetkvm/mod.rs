@@ -1,10 +1,10 @@
-//! JetKVM adapter — control rides WebRTC DataChannels ([`TransportKind::PeerRpc`]).
+//! JetKVM adapter: control rides WebRTC DataChannels ([`TransportKind::PeerRpc`]).
 //!
 //! A WebRTC peer connection (signaling at `/webrtc/session`) must be negotiated before
 //! *any* control. JetKVM splits functions across channels: a `rpc` channel carries
 //! JSON-RPC 2.0 for control (video/EDID/power/etc.), while HID rides separate **binary**
 //! `hidrpc*` channels. The HID frame formats are decoded in the `wire` module and the
-//! sans-IO WebRTC transport lives in the `transport` module — both from wire captures
+//! sans-IO WebRTC transport lives in the `transport` module, both from wire captures
 //! (docs/captures/jetkvm-datachannel-hid.md), never from device source.
 //!
 //! HID is live: [`JetKvm::connect`] logs in, brings up the peer connection, and
@@ -80,7 +80,7 @@ impl JetKvm {
     }
 
     /// Fetch the device's version info over the JSON-RPC `rpc` channel
-    /// (`getLocalVersion`) — a read-only control call, useful as a liveness check and
+    /// (`getLocalVersion`), a read-only control call, useful as a liveness check and
     /// to populate firmware info later.
     pub async fn local_version(&self) -> Result<serde_json::Value> {
         self.transport
@@ -104,7 +104,7 @@ impl Device for JetKvm {
             keyboard: true,
             absolute_mouse: true,
             relative_mouse: false, // only the absolute frame (type 0x03) is decoded
-            video_mjpeg: false,    // WebRTC only — no MJPEG fallback
+            video_mjpeg: false,    // WebRTC only, no MJPEG fallback
             video_h264: true,
             video_webrtc: true,
             power_on_off: true, // via ATX/DC extension hardware
@@ -122,7 +122,7 @@ impl Device for JetKvm {
 
 impl Hid for JetKvm {
     async fn key(&self, event: KeyEvent) -> Result<()> {
-        // JetKVM keyboard frames carry raw USB HID usage codes — direct from core.
+        // JetKVM keyboard frames carry raw USB HID usage codes, direct from core.
         self.transport
             .send_hid(wire::key_event(event.key.0, event.pressed).to_vec())
     }
@@ -156,7 +156,7 @@ impl Hid for JetKvm {
     }
 }
 
-// Power and virtual media use the JSON-RPC `rpc` channel — not wired yet.
+// Power and virtual media use the JSON-RPC `rpc` channel; not wired yet.
 impl Power for JetKvm {
     async fn action(&self, _action: PowerAction) -> Result<()> {
         Err(Error::NotImplemented)

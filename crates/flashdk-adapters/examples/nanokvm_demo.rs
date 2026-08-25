@@ -1,5 +1,5 @@
 //! Live proof-of-life for the NanoKVM adapter: performs the AES login and opens the
-//! HID WebSocket, then prints capabilities. Sends NO input — zero side effects.
+//! HID WebSocket, then prints capabilities. Sends no input: zero side effects.
 //!
 //! ```bash
 //! NANOKVM_HOST=10.0.10.10 NANOKVM_USER=labored3640 NANOKVM_PASS='...' \
@@ -34,6 +34,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(imgs) => println!("Virtual-media images: {}", imgs.len()),
         Err(e) => println!("Media list: unavailable ({e})"),
     }
-    println!("Login + WebSocket OK — no input was sent.");
+    println!("Login and WebSocket OK, no input was sent.");
     Ok(())
 }
