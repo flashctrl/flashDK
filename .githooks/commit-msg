@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Conventional Commits check, adapted from conformIT
+# (https://github.com/almadon/conformIT, MIT licensed).
+# See CONTRIBUTING.md and docs/decisions.md #9. Bypass once with: git commit --no-verify
+#
+# Portable to bash 3.2 (macOS system bash): no mapfile, no associative arrays.
+set -uo pipefail
+
+MSG_FILE="$1"
+
+# Non-comment lines only.
+CLEAN="$(grep -v '^#' "$MSG_FILE")"
+
+SUBJECT="$(printf '%s\n' "$CLEAN" | sed -n '1p')"
+
+if [ -z "$(printf '%s' "$CLEAN" | tr -d '[:space:]')" ]; then
+  echo "commit-msg: empty commit message." >&2
+  exit 1
+fi
+
+TYPES='feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert'
+
+fail() {
+  {
+    echo "commit-msg: $1"
+    echo
+    echo "  subject: $SUBJECT"
+    echo
+    echo "  expected: type(scope): description"
+    echo "  types:    $(printf '%s' "$TYPES" | tr '|' ' ')"
+    echo
+    echo "  See CONTRIBUTING.md. Bypass once: git commit --no-verify"
+  } >&2
+  exit 1
+}
+
+# Merge and git-generated revert commits are left alone.
+case "$SUBJECT" in
+  "Merge "*|"Revert \""*) exit 0 ;;
+esac
+
+printf '%s' "$SUBJECT" | grep -Eq "^(${TYPES})(\([a-z0-9._/-]+\))?!?: .+" \
+  || fail "subject does not match Conventional Commits."
+
+LEN=${#SUBJECT}
+[ "$LEN" -le 72 ] || fail "subject is $LEN characters; the limit is 72."
+
+case "$SUBJECT" in
+  *.) fail "subject ends with a full stop." ;;
+esac
+
+DESC="${SUBJECT#*: }"
+case "$DESC" in
+  [A-Z]*) fail "description starts with a capital. Use imperative lower case." ;;
+esac
+
+# Past-tense and gerund subjects are the most common drift; catch the obvious ones.
+FIRST_WORD="${DESC%% *}"
+case "$FIRST_WORD" in
+  added|fixed|updated|removed|changed|adding|fixing|updating|removing|changing)
+    fail "description is not imperative ('$FIRST_WORD'). Write 'add', not 'added'." ;;
+esac
+
+# '!' marks a breaking change for tooling; the footer is for the person
+# who has to deal with it. Require both.
+case "$SUBJECT" in
+  *'!:'*)
+    grep -q '^BREAKING CHANGE: ' "$MSG_FILE" \
+      || fail "'!' marks a breaking change but there is no 'BREAKING CHANGE: ' footer." ;;
+esac
+
+# A missing body is a nudge, never a block. Some changes really are one-liners.
+BODY="$(printf '%s\n' "$CLEAN" | sed -n '3,$p' | tr -d '[:space:]')"
+if [ -z "$BODY" ]; then
+  {
+    echo "commit-msg: no body."
+    echo "  The diff says what changed; the body says why, what it cost,"
+    echo "  and what you verified. Committing anyway."
+  } >&2
+fi
+
+exit 0
