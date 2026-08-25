@@ -1,4 +1,4 @@
-# cargo-deny — the machine-enforced compliance layer for flashDK.
+# cargo-deny: the machine-enforced compliance layer for flashDK.
 #
 # Goal: make the project legally and operationally defensible by construction
 # (license-clean, supply-chain-clean, clean-room). Every check below runs in CI on

@@ -1,7 +1,7 @@
-//! What a given device can do — discovered, never assumed.
+//! What a given device can do, discovered, never assumed.
 //!
 //! The golden rule from our probing: **capability-flag everything, assume nothing.**
-//! Power is the classic trap — it's one concept (turn the machine on/off) over three
+//! Power is the classic trap: it's one concept (turn the machine on/off) over three
 //! totally different mechanisms, and NanoKVM can't do a true ATX *reset* at all. So
 //! the app must ask [`Capabilities`] what's present and render accordingly.
 
@@ -12,7 +12,7 @@ pub enum Vendor {
     NanoKvm,
     PiKvm,
     JetKvm,
-    /// GL.iNet Comet — untested; we don't own the hardware yet. Present so the type
+    /// GL.iNet Comet: untested, we don't own the hardware yet. Present so the type
     /// is complete, but no adapter ships until we've probed a real unit.
     GlInet,
 }

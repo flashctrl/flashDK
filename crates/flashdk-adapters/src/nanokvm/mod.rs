@@ -1,4 +1,4 @@
-//! NanoKVM PCIe adapter — REST for auth/aux, and a binary WebSocket (`/api/ws`) for
+//! NanoKVM PCIe adapter: REST for auth/aux, and a binary WebSocket (`/api/ws`) for
 //! live keyboard and mouse. Everything here is derived from wire observation
 //! (docs/captures/nanokvm-ws-hid.md, and the publicly-documented AES login).
 
@@ -53,7 +53,7 @@ struct NkResponse {
 
 /// Pull the firmware/image version out of a `GET /api/vm/info` `data` payload
 /// (`{"image":"v1.4.0","application":"2.5.0","deviceKey":"...",...}`, verified live
-/// against a NanoKVM PCIe earlier — see conversation history for the exact capture).
+/// against a NanoKVM PCIe; see the unit tests below for the exact captured shape).
 fn extract_image_version(data: &serde_json::Value) -> Option<String> {
     data["image"].as_str().map(str::to_string)
 }

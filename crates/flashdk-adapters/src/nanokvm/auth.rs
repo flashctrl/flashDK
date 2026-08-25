@@ -3,7 +3,7 @@
 //!
 //! The scheme (a hardcoded passphrase + OpenSSL "Salted__" envelope) is both wire-
 //! observable and publicly documented (disclosed Feb 2025). We reproduce the
-//! *observable transformation* with RustCrypto — no vendor code is used. Note this is
+//! *observable transformation* with RustCrypto, so no vendor code is used. Note this is
 //! obfuscation, not real security: it rides over plaintext HTTP unless the device is
 //! configured for TLS.
 

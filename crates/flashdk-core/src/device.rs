@@ -2,7 +2,7 @@
 //!
 //! An adapter implements the input/power/media traits *and* [`Device`], which adds the
 //! self-description the app needs: who it is, what it can do, and which transport shape
-//! it uses. Note there is **no vendor-specific type in this crate** — the concrete
+//! it uses. Note there is **no vendor-specific type in this crate**: the concrete
 //! `Kvm` dispatcher lives in `flashdk-adapters`, keeping core vendor-agnostic.
 
 use crate::capability::{Capabilities, Vendor};
@@ -27,7 +27,7 @@ pub struct DeviceInfo {
 /// The umbrella contract: anything that is a drivable KVM implements the three
 /// capability traits **and** can describe itself.
 ///
-/// Because the capability traits use `async fn`, `Device` is not object-safe — you
+/// Because the capability traits use `async fn`, `Device` is not object-safe, so you
 /// can't write `Box<dyn Device>`. That's deliberate: for runtime polymorphism across
 /// vendors we use the `Kvm` enum in `flashdk-adapters`, which is faster and clearer
 /// than dynamic dispatch anyway.
@@ -38,7 +38,7 @@ pub trait Device: Hid + Power + VirtualMedia {
     /// What this specific device supports. The app reads this to decide what to show.
     fn capabilities(&self) -> Capabilities;
 
-    /// Which transport shape this device uses — the app checks
+    /// Which transport shape this device uses. The app checks
     /// [`TransportKind::requires_peer_connection`] to know whether to bring up WebRTC
     /// before enabling controls.
     fn transport_kind(&self) -> TransportKind;

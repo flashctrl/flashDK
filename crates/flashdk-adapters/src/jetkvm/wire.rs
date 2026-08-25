@@ -2,15 +2,15 @@
 //!
 //! Decoded from DataChannel captures (see docs/captures/jetkvm-datachannel-hid.md).
 //! JetKVM carries HID as compact binary frames on its `hidrpc*` WebRTC DataChannels
-//! (not JSON-RPC — that's the separate `rpc` channel for control). The unit tests
+//! (not JSON-RPC; that's the separate `rpc` channel for control). The unit tests
 //! below assert the exact bytes observed from the official client.
 //!
 //! Frames:
-//! * keyboard (3 bytes): `[0x05][usage][state]` — one event per key (not a full
+//! * keyboard (3 bytes): `[0x05][usage][state]`, one event per key (not a full
 //!   report), where `usage` is a USB HID usage code and `state` is 1 down / 0 up.
 //!   This maps directly to `flashdk_core::hid::KeyEvent`.
 //! * mouse, absolute (10 bytes): `[0x03][buttons][X big-endian][pad][Y big-endian]
-//!   [wheel]`, X/Y in `0..=32767` = fraction of the screen — the same convention as
+//!   [wheel]`, X/Y in `0..=32767` = fraction of the screen, the same convention as
 //!   `flashdk_core::hid::AbsMouse`. Sent on the `hidrpc-unreliable-ordered` channel.
 
 // These encoders are decoded and verified ahead of the WebRTC transport that will call
@@ -27,7 +27,7 @@ pub fn key_event(usage: u8, pressed: bool) -> [u8; 3] {
 ///
 /// The observed layout writes X and Y as big-endian with a zero high byte and a zero
 /// separator (consistent with either 16-bit fields at \[3,4\]/\[7,8\] or 24-bit fields
-/// at \[2,3,4\]/\[6,7,8\] — identical for our 0..=32767 range). We reproduce the exact
+/// at \[2,3,4\]/\[6,7,8\], identical for our 0..=32767 range). We reproduce the exact
 /// 10-byte frame.
 pub fn mouse_abs(buttons: u8, x: u16, y: u16, wheel: i8) -> [u8; 10] {
     let [x_hi, x_lo] = x.to_be_bytes();

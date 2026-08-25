@@ -5,11 +5,11 @@
 //! encoders can't drift from the real protocol.
 //!
 //! Frames:
-//! * keyboard (9 bytes): `[0x01][modifiers][0x00][k1..k6]` — a standard USB HID
+//! * keyboard (9 bytes): `[0x01][modifiers][0x00][k1..k6]`, a standard USB HID
 //!   keyboard report; keys are raw HID usage codes, which is exactly what
 //!   `flashdk_core::hid::KeyCode` carries.
 //! * mouse (7 bytes): `[0x02][buttons][Xlo][Xhi][Ylo][Yhi][wheel]`, coords little-
-//!   endian `0..=32767` — exactly `flashdk_core::hid::AbsMouse`'s convention.
+//!   endian `0..=32767`, exactly `flashdk_core::hid::AbsMouse`'s convention.
 
 /// USB HID modifier usage codes occupy 0xE0..=0xE7 and go in the report's modifier
 /// bitmask rather than the key array.

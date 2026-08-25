@@ -1,12 +1,12 @@
-//! Human Interface Device: keyboard and mouse — the layer that unifies most cleanly.
+//! Human Interface Device: keyboard and mouse, the layer that unifies most cleanly.
 //!
 //! Every target device ultimately accepts the same thing: USB HID reports. The
 //! envelopes differ (PiKVM/NanoKVM take REST or WebSocket messages; JetKVM takes a
 //! `keyboardReport` JSON-RPC call over its DataChannel) but the *meaning* is identical.
-//! So this is where we build first — one interface, thin per-vendor encoders.
+//! So this is where we build first: one interface, thin per-vendor encoders.
 //!
 //! Key codes here are **USB HID usage IDs**, a public standard (USB-IF HID Usage
-//! Tables). Using the standard — rather than any vendor's key map — keeps us squarely
+//! Tables). Using the standard, rather than any vendor's key map, keeps us squarely
 //! clean-room: we encode to a spec everyone shares, not to anyone's source.
 
 use crate::error::Result;
@@ -16,12 +16,12 @@ use crate::error::Result;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeyCode(pub u8);
 
-/// Left Shift modifier usage id — used to type shifted characters.
+/// Left Shift modifier usage id, used to type shifted characters.
 pub const LEFT_SHIFT: KeyCode = KeyCode(0xE1);
 
 /// Map a character to its US-layout HID usage id and whether Shift is required.
 ///
-/// Uses the USB HID Usage Tables (page 0x07) and the US ANSI keyboard layout — both
+/// Uses the USB HID Usage Tables (page 0x07) and the US ANSI keyboard layout, both
 /// public standards, so this stays clean-room. Returns `None` for characters not
 /// reachable on a US layout (callers typing text should skip those).
 pub fn char_to_hid(c: char) -> Option<(KeyCode, bool)> {
@@ -91,7 +91,7 @@ pub enum MouseButton {
 
 /// Absolute pointer position, normalised to 0..=32767 on each axis (the USB absolute
 /// mouse convention). Absolute positioning is what makes a remote cursor track your
-/// finger/mouse 1:1 without drift — preferred wherever the device supports it.
+/// finger/mouse 1:1 without drift, preferred wherever the device supports it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AbsMouse {
     pub x: u16,
@@ -117,8 +117,8 @@ pub struct Wheel {
 /// The keyboard/mouse contract every adapter implements.
 ///
 /// These are `async` because they cross the network. An adapter turns each call into
-/// whatever its device expects — an HTTP POST, a WebSocket frame, or a DataChannel
-/// RPC — while callers stay blissfully unaware of which.
+/// whatever its device expects (an HTTP POST, a WebSocket frame, or a DataChannel
+/// RPC) while callers stay blissfully unaware of which.
 pub trait Hid {
     /// Send a single key press or release.
     async fn key(&self, event: KeyEvent) -> Result<()>;

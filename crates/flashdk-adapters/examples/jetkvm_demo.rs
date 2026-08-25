@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connecting to JetKVM (login + WebRTC handshake)…");
     let kvm = tokio::time::timeout(Duration::from_secs(25), JetKvm::connect(host, &pass))
         .await
-        .map_err(|_| "connect timed out — WebRTC/hidrpc channel never opened")??;
+        .map_err(|_| "connect timed out: WebRTC/hidrpc channel never opened")??;
 
     println!(
         "Connected: {} ({:?}), transport {:?}",

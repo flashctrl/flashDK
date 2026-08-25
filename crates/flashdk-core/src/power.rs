@@ -1,4 +1,4 @@
-//! Machine power control — one concept, three mechanisms underneath.
+//! Machine power control: one concept, three mechanisms underneath.
 //!
 //! Not every action exists on every device (NanoKVM has no true reset). Adapters
 //! return [`Error::NotSupported`](crate::Error::NotSupported) for actions their
@@ -12,9 +12,9 @@ use crate::error::Result;
 pub enum PowerAction {
     /// Turn on (or short-press the power button on a machine that's off).
     On,
-    /// Graceful short press — asks the OS to shut down.
+    /// Graceful short press: asks the OS to shut down.
     ShortPress,
-    /// Forceful long press — cuts power after a held button.
+    /// Forceful long press: cuts power after a held button.
     LongPress,
     /// Hardware reset line. Not all devices have this.
     Reset,
