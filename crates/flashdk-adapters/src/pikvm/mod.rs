@@ -32,6 +32,11 @@ pub struct PiKvm {
     user: String,
     passwd: String,
     http: reqwest::Client,
+    /// Cached (model, firmware), populated by [`Self::refresh_identity`]. `new()`
+    /// makes no network call (matching `Device::info`'s "cheap, no I/O" contract), so
+    /// this starts `None` and `info()` falls back to sensible defaults until a caller
+    /// refreshes it.
+    identity: std::sync::Mutex<Option<(String, String)>>,
 }
 
 impl PiKvm {
@@ -66,7 +71,28 @@ impl PiKvm {
             user: user.into(),
             passwd: passwd.into(),
             http,
+            identity: std::sync::Mutex::new(None),
         })
+    }
+
+    /// Fetch the board model and kvmd version from `/api/info` and cache them so
+    /// subsequent [`Device::info`] calls report real values instead of the defaults.
+    /// `new()` deliberately makes no network call, so call this once after connecting
+    /// if you want accurate identity (e.g. for a "hardened firmware ✓" badge later).
+    pub async fn refresh_identity(&self) -> Result<()> {
+        let r = self.get("/api/info").await?;
+        let model = r["hw"]["platform"]["base"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| "PiKVM".to_string());
+        let firmware = r["system"]["kvmd"]["version"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| "unknown".to_string());
+        if let Ok(mut id) = self.identity.lock() {
+            *id = Some((model, firmware));
+        }
+        Ok(())
     }
 
     /// Attach the auth headers kvmd expects to any request.
@@ -138,10 +164,16 @@ impl PiKvm {
 
 impl Device for PiKvm {
     fn info(&self) -> DeviceInfo {
+        let (model, firmware) = self
+            .identity
+            .lock()
+            .ok()
+            .and_then(|g| g.clone())
+            .unwrap_or_else(|| ("PiKVM v3".to_string(), "unknown".to_string()));
         DeviceInfo {
             vendor: Vendor::PiKvm,
-            model: "PiKVM v3".to_string(),
-            firmware: "unknown".to_string(),
+            model,
+            firmware,
             hardened: false,
         }
     }

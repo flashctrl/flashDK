@@ -19,7 +19,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pass = std::env::var("PIKVM_PASS").expect("set PIKVM_PASS");
 
     let kvm = PiKvm::new(host, user, pass)?;
-    println!("Connected: {} ({:?})", kvm.info().model, kvm.info().vendor);
+    println!(
+        "Before refresh: {} ({:?})",
+        kvm.info().model,
+        kvm.info().vendor
+    );
+    if let Err(e) = kvm.refresh_identity().await {
+        println!("refresh_identity failed: {e}");
+    }
+    println!(
+        "After refresh:  {} (firmware {})",
+        kvm.info().model,
+        kvm.info().firmware
+    );
 
     match kvm.state().await {
         Ok(s) => println!("Power state: {:?}", s),

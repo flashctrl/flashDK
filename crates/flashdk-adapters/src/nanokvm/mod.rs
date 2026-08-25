@@ -36,6 +36,8 @@ pub struct NanoKvm {
     base_url: String,
     http: reqwest::Client,
     token: String,
+    /// Firmware ("image") version read from /api/vm/info at connect, e.g. "v1.4.0".
+    firmware: String,
     ws: AsyncMutex<WsSink>,
     keyboard: Mutex<KeyboardState>,
     mouse: Mutex<MousePos>,
@@ -47,6 +49,13 @@ struct NkResponse {
     code: i64,
     #[serde(default)]
     data: serde_json::Value,
+}
+
+/// Pull the firmware/image version out of a `GET /api/vm/info` `data` payload
+/// (`{"image":"v1.4.0","application":"2.5.0","deviceKey":"...",...}`, verified live
+/// against a NanoKVM PCIe earlier — see conversation history for the exact capture).
+fn extract_image_version(data: &serde_json::Value) -> Option<String> {
+    data["image"].as_str().map(str::to_string)
 }
 
 impl NanoKvm {
@@ -80,11 +89,27 @@ impl NanoKvm {
             .map_err(|e| Error::Transport(e.to_string()))?;
         let (sink, _read) = stream.split();
 
+        // Best-effort: read the firmware/image version for DeviceInfo.
+        let vm_info = http
+            .get(format!("{base_url}/api/vm/info"))
+            .header("Cookie", format!("nano-kvm-token={token}"))
+            .send()
+            .await
+            .ok();
+        let mut parsed: Option<NkResponse> = None;
+        if let Some(r) = vm_info {
+            parsed = r.json::<NkResponse>().await.ok();
+        }
+        let firmware = parsed
+            .and_then(|r| extract_image_version(&r.data))
+            .unwrap_or_else(|| "unknown".to_string());
+
         Ok(Self {
             host,
             base_url,
             http,
             token,
+            firmware,
             ws: AsyncMutex::new(sink),
             keyboard: Mutex::new(KeyboardState::default()),
             mouse: Mutex::new(MousePos::default()),
@@ -150,7 +175,7 @@ impl Device for NanoKvm {
         DeviceInfo {
             vendor: Vendor::NanoKvm,
             model: "NanoKVM PCIe".to_string(),
-            firmware: "unknown".to_string(),
+            firmware: self.firmware.clone(),
             hardened: false,
         }
     }
@@ -296,5 +321,29 @@ impl VirtualMedia for NanoKvm {
         )
         .await
         .map(|_| ())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_image_version;
+
+    /// The exact `data` payload observed live from a NanoKVM PCIe's
+    /// `GET /api/vm/info` (app 2.5.0, image v1.4.0).
+    #[test]
+    fn extracts_image_from_captured_shape() {
+        let data = serde_json::json!({
+            "ips": [{"name":"eth0","addr":"10.0.10.10","version":"IPv4","type":"Wired"}],
+            "mdns": "",
+            "image": "v1.4.0",
+            "application": "2.5.0",
+            "deviceKey": "0000000000000000"
+        });
+        assert_eq!(extract_image_version(&data), Some("v1.4.0".to_string()));
+    }
+
+    #[test]
+    fn missing_image_field_is_none() {
+        assert_eq!(extract_image_version(&serde_json::json!({})), None);
     }
 }
