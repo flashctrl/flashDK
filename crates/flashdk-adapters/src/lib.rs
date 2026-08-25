@@ -12,6 +12,7 @@
 
 pub mod jetkvm;
 pub mod nanokvm;
+pub mod nut;
 pub mod pikvm;
 pub mod tls_pin;
 

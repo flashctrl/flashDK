@@ -4,7 +4,7 @@ Working notes for flashDK itself. Delete or rewrite the sections below once they
 longer reflect a moving target: the per-vendor picture, once all four vendors have
 settled adapters, and the open questions, once they're answered.
 
-**Last updated:** 2026-08-24.
+**Last updated:** 2026-08-25.
 
 ## What is true right now, per vendor
 
@@ -19,6 +19,22 @@ settled adapters, and the open questions, once they're answered.
 just compiled. Every adapter also carries unit tests pinning its wire encoders to the
 exact bytes captured live, independent of whether the device happens to be reachable
 on a given day.
+
+## Beyond KVMs: power infrastructure
+
+`PowerOutlet` and `UpsStatus` (`flashdk-core`) are scaffolded per
+[ROADMAP.md](ROADMAP.md); no adapter implements `PowerOutlet` yet. A NUT client
+(`flashdk_adapters::nut`) implements `UpsStatus`, built from IETF RFC 9271 and
+NUT's official manual pages rather than any device or NUT's own source. Its
+protocol encoder and parser are unit-tested against the RFC's own literal example
+text, real verification of the wire format, but the TCP client has not been
+exercised against a running `upsd` or a real UPS: this project has neither
+available yet. Different confidence tiers within the same adapter, worth being
+precise about rather than calling the whole thing either "done" or "untested":
+`battery.charge`, `ups.status`, and `test.panel.start` are quoted directly in the
+RFC text; `ups.load`, `battery.runtime`, and the beeper commands are corroborated
+independently but not RFC-primary. See
+`crates/flashdk-adapters/src/nut/PROVENANCE.md`.
 
 ## What is not built yet
 
