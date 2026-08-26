@@ -79,6 +79,31 @@ header invalidates the session (`{"ok": true, "result": {}}`).
 succeeded cleanly a few seconds later; that's a real, meaningful error shape
 this adapter should map, not a sign the endpoint doesn't exist.
 
+## Follow-up capture: mouse output mode and virtual-media write
+
+A second session against the same unit (still no host attached, but
+`GET /api/hid` had started reporting `mouse.online`/`keyboard.online` as
+`true` where the first capture saw `false`, suggesting a host may since have
+been connected) confirmed two more things:
+
+- `POST /api/hid/set_params?mouse_output=usb_rel` (and back to `usb`) really
+  switches the device's single physical mouse HID endpoint between absolute
+  and relative mode: `GET /api/hid` afterward shows `mouse.outputs.active`
+  and `mouse.absolute` flip accordingly. `/api/hid/events/send_mouse_relative`
+  (`delta_x`, `delta_y`) then returns `ok: true`. The two modes are mutually
+  exclusive on this hardware, not simultaneously available, confirmed by this
+  toggle rather than assumed.
+- `POST /api/msd/write?image=<name>` (raw body = file bytes) and
+  `POST /api/msd/remove?image=<name>` both work as expected for uploading and
+  deleting a virtual-media image. `POST /api/msd/set_params?image=<name>`
+  (selecting an image) also succeeds. `POST /api/msd/set_connected?connected=1`
+  (actually presenting it to the host), tried against a trivial 5-byte test
+  file, returned a plain-text `500 Internal Server Error`, not the device's
+  usual JSON error shape: a real backend failure, most likely because a
+  degenerate file isn't something the mass-storage gadget can actually back,
+  not a sign the endpoint or request shape is wrong. Mount-with-a-real-image
+  and the resulting observable "connected" transition remain unverified.
+
 ## What this capture does not establish
 
 No host was attached to the capture port during this session, so none of the
@@ -91,6 +116,7 @@ axis, per PiKVM's already-verified transform) was not independently
 re-derived here; the `glinet` adapter reuses PiKVM's exact transform on the
 assumption the two share the same `kvmd`-family coordinate convention, which
 is a documented assumption, not an independently confirmed fact for this
-specific device. `/api/msd`'s mount/connect actions were not exercised
-(no image was available to mount on this fresh unit); only the read-only
-`GET /api/msd` shape is verified.
+specific device. `/api/msd/set_connected` (the actual mount step) has only
+been exercised against a degenerate test file and failed server-side (see
+above); a real image and an observable "host sees the drive" check remain
+outstanding.

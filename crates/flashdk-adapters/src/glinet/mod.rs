@@ -176,6 +176,23 @@ impl GlInetKvm {
         Ok(())
     }
 
+    /// This device's mouse is a single hardware HID endpoint that's either in
+    /// absolute (`usb`) or relative (`usb_rel`) mode, never both at once
+    /// (`GET /api/hid` reports one `mouse.outputs.active` value, and switching
+    /// away from a mode was confirmed live to flip `mouse.absolute` and
+    /// `mouse.online`). `POST /api/hid/set_params?mouse_output=<usb|usb_rel>`
+    /// switches it, verified live for both directions. This checks the current
+    /// mode first and only switches when needed, so calling the mode already
+    /// active is a no-op read plus zero extra writes.
+    async fn ensure_mouse_output(&self, want: &str) -> Result<()> {
+        let hid = self.get("/api/hid").await?;
+        if hid["mouse"]["outputs"]["active"].as_str() == Some(want) {
+            return Ok(());
+        }
+        self.post("/api/hid/set_params", &[("mouse_output", want)])
+            .await
+    }
+
     /// Reconcile the three mouse buttons to kvmd's per-button events, the same
     /// approach PiKVM's adapter uses (this device's `send_mouse_button` shape is
     /// independently verified live for `left`; `right`/`middle` follow the same
@@ -217,11 +234,9 @@ impl Device for GlInetKvm {
         Capabilities {
             keyboard: true,
             absolute_mouse: true,
-            // kvmd's `mouse.outputs` on this device lists a `usb_rel` mode
-            // alongside the default `usb` (absolute) one, but switching output
-            // modes wasn't captured, so relative mouse stays unimplemented rather
-            // than claimed here; see PROVENANCE.md.
-            relative_mouse: false,
+            // Mode-switch endpoint (`/api/hid/set_params?mouse_output=usb_rel`)
+            // confirmed live; see `ensure_mouse_output` and PROVENANCE.md.
+            relative_mouse: true,
             video_mjpeg: true,
             video_h264: true,
             video_webrtc: true,
@@ -255,6 +270,7 @@ impl Hid for GlInetKvm {
         // -32768..=32767 per axis). Not independently re-derived against this
         // specific device (no host attached to observe a cursor land); see
         // PROVENANCE.md for why this is a documented assumption, not a fact.
+        self.ensure_mouse_output("usb").await?;
         let to_x = ((m.x as i32) * 2 - 32768).to_string();
         let to_y = ((m.y as i32) * 2 - 32768).to_string();
         self.post(
@@ -265,10 +281,15 @@ impl Hid for GlInetKvm {
         self.sync_buttons(m.buttons).await
     }
 
-    async fn relative_mouse(&self, _m: RelMouse) -> Result<()> {
-        Err(Error::NotSupported(
-            "relative mouse mode switch not yet captured on this device",
-        ))
+    async fn relative_mouse(&self, m: RelMouse) -> Result<()> {
+        self.ensure_mouse_output("usb_rel").await?;
+        let (dx, dy) = (m.dx.to_string(), m.dy.to_string());
+        self.post(
+            "/api/hid/events/send_mouse_relative",
+            &[("delta_x", &dx), ("delta_y", &dy)],
+        )
+        .await?;
+        self.sync_buttons(m.buttons).await
     }
 
     async fn wheel(&self, w: Wheel) -> Result<()> {

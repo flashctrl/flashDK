@@ -30,15 +30,30 @@ things from `crate::pikvm`, both safe to share:
   that both devices' `kvmd`-family backends share the same convention. Flagged
   here explicitly rather than silently inherited.
 
+## Mouse output mode: independently confirmed for this device
+
+Unlike the coordinate transform above, the absolute/relative mode switch
+*was* independently verified live for this specific Comet unit (not just
+assumed from PiKVM): `POST /api/hid/set_params?mouse_output=usb_rel` (and
+back to `usb`) flips `GET /api/hid`'s own `mouse.outputs.active` and
+`mouse.absolute` fields, and `/api/hid/events/send_mouse_relative` then
+returns `ok: true`. `GlInetKvm::ensure_mouse_output` checks the current mode
+before switching, since the two modes are mutually exclusive on this
+hardware (one physical HID endpoint, not two independent ones).
+
 ## What's independently verified for this device
 
 Every endpoint below was actually called against the real Comet unit and
 returned the response shown in the capture doc: `/api/auth/login` (login),
 `/api/auth/logout`, `/api/info`, `/api/hid`, `/api/hid/events/send_key`,
 `/api/hid/events/send_mouse_move`, `/api/hid/events/send_mouse_button`,
-`/api/hid/events/send_mouse_wheel`, `/api/atx`, `/api/atx/click` (`power`,
-`power_long`, and `reset` buttons all confirmed), and `/api/msd` (read-only;
-no image was available to test mount/connect against).
+`/api/hid/events/send_mouse_wheel`, `/api/hid/events/send_mouse_relative`,
+`/api/hid/set_params` (mouse output mode), `/api/atx`, `/api/atx/click`
+(`power`, `power_long`, and `reset` buttons all confirmed), `/api/msd`,
+`/api/msd/write`, `/api/msd/set_params`, and `/api/msd/remove`.
+`/api/msd/set_connected=1` (the actual mount step) was tried and failed
+server-side against a degenerate test file; see the capture doc's follow-up
+section.
 
 ## Auth flow, the one real difference from PiKVM
 
