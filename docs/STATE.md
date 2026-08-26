@@ -36,6 +36,21 @@ RFC text; `ups.load`, `battery.runtime`, and the beeper commands are corroborate
 independently but not RFC-primary. See
 `crates/flashdk-adapters/src/nut/PROVENANCE.md`.
 
+Ubiquiti UniFi PDU: checked, not built. The official Network Integration API's
+published OpenAPI schema (`developer.ui.com/network`, v10.4.57) has no PDU
+concept at all: `features` is exactly `switching`/`accessPoint`/`gateway`,
+`interfaces` is exactly `ports`/`radios`, and there is no `outlet`, `relay`, or
+`pdu` anywhere in its paths or component schemas. An earlier `RELAY` grep hit
+was a false positive (DHCP Relay Configuration). The only device-control
+actions the schema documents are a generic `RESTART` and a per-port PoE
+`POWER_CYCLE`, neither of which is outlet-specific PDU control. Real outlet
+control almost certainly exists only via the older, undocumented internal
+Controller API, which is community-reverse-engineered and doesn't clear
+[CLEANROOM.md](../CLEANROOM.md)'s bar. Status: blocked on either Ubiquiti
+documenting it officially or this project acquiring a UniFi PDU to probe
+directly. See `docs/ROADMAP.md`'s "Ubiquiti UniFi PDU" section for the full
+writeup.
+
 ## What is not built yet
 
 - **JetKVM power and virtual media.** The transport is live and the `rpc` channel
