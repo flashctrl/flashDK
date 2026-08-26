@@ -4,7 +4,7 @@ Working notes for flashDK itself. Delete or rewrite the sections below once they
 longer reflect a moving target: the per-vendor picture, once all four vendors have
 settled adapters, and the open questions, once they're answered.
 
-**Last updated:** 2026-08-25.
+**Last updated:** 2026-08-26.
 
 ## What is true right now, per vendor
 
@@ -51,6 +51,30 @@ documenting it officially or this project acquiring a UniFi PDU to probe
 directly. See `docs/ROADMAP.md`'s "Ubiquiti UniFi PDU" section for the full
 writeup.
 
+## Beyond KVMs: enterprise BMCs (Redfish)
+
+A first-pass `redfish` adapter (`flashdk_adapters::redfish`) now implements
+`Power` (via `#ComputerSystem.Reset`) and `VirtualMedia` (via
+`#VirtualMedia.InsertMedia`/`EjectMedia`), built directly from the official
+DMTF DSP8010 JSON Schema bundle, downloaded and read as raw JSON rather than a
+summarized fetch, the same discipline the NUT adapter's RFC reading used. The
+`ResetType` enum, the `Reset`/`InsertMedia`/`EjectMedia` action shapes, and the
+`UserName`/`Password` session fields are all confirmed directly against
+schema files (`ComputerSystem.v1_28_0.json`, `Resource.json`,
+`VirtualMedia.v1_6_5.json`, `Session.v1_7_0.json`, `ServiceRoot.v1_18_0.json`).
+The session-login handshake itself (`POST` to `SessionService/Sessions`,
+token returned via the `X-Auth-Token` header) is documented in the core
+DSP0266 specification rather than a schema file, so it's corroborated across
+two DMTF documents rather than quoted from one. See
+`crates/flashdk-adapters/src/redfish/PROVENANCE.md`.
+
+Compiles and passes unit tests against the schema's literal values (7 tests in
+`redfish::protocol`), but the end-to-end HTTP flow (login, root/system/manager
+discovery, action dispatch) has not been exercised against a real BMC: this
+project has neither an iDRAC nor an iLO unit on hand. Serial console over
+Redfish isn't implemented yet, and each vendor's own graphical console (a
+separate, proprietary layer per `docs/ROADMAP.md`) is out of scope entirely.
+
 ## What is not built yet
 
 - **JetKVM power and virtual media.** The transport is live and the `rpc` channel
@@ -59,9 +83,9 @@ writeup.
 - **A UniFFI layer.** Nothing generates Swift or Kotlin bindings yet; the crates are
   Rust-only consumers today (see the example binaries under
   `crates/flashdk-adapters/examples/`).
-- **TOFU pinning beyond PiKVM.** The mechanism in `tls_pin.rs` is written to be
-  reused, but nothing else currently needs it: NanoKVM has no TLS to pin, and
-  JetKVM's HTTP signaling is unauthenticated by transport (its media is secured by
+- **TOFU pinning beyond PiKVM and Redfish.** The mechanism in `tls_pin.rs` is
+  reused as-is by `redfish::RedfishBmc`; NanoKVM has no TLS to pin, and JetKVM's
+  HTTP signaling is unauthenticated by transport (its media is secured by
   WebRTC's own DTLS instead).
 
 ## What the previous notes got wrong
