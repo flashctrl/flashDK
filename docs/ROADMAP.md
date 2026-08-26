@@ -8,8 +8,15 @@ protocol with a Rust reimplementation of its AES-based login. JetKVM has live,
 verified HID over WebRTC DataChannels, built on the sans-IO `str0m` stack; its
 power and virtual media ride the same connection's JSON-RPC `rpc` channel but
 aren't implemented yet, because the specific method names and payload shapes
-haven't been captured off the wire. GL.iNet's Comet (GL-RM1/PE) has no adapter,
-pending hardware.
+haven't been captured off the wire. GL.iNet's Comet (GL-RM1) has the same three
+as PiKVM, live-verified end to end against a real unit: it turns out to run the
+`kvmd` daemon stack itself (confirmed via its own `/api/info`), with its own
+login-and-token auth flow rather than PiKVM's static per-request headers; see
+`crates/flashdk-adapters/src/glinet/PROVENANCE.md` and
+`docs/captures/glinet-comet-kvmd-api.md`. No host was attached to the capture
+port during verification, so HID/power actions are confirmed as accepted API
+calls, not as producing an observable effect on a real target; see
+[STATE.md](STATE.md).
 
 ## Planned: enterprise out-of-band management (BMCs)
 
@@ -108,11 +115,11 @@ strengthens the security story further.
 
 ### Sequencing
 
-GL.iNet first, since it closes out the hobbyist-KVM set already underway. Then a
-`redfish` adapter covering iDRAC and iLO power, media, and serial, which is high
-value and standards-based enough to move quickly. AMT after that, with the
-proprietary graphical consoles (iDRAC, iLO, and AMT's own) as a later push once
-the standards-based groundwork is in place.
+GL.iNet closed out the hobbyist-KVM set (done: HID/power/media all live-verified
+against a real unit). Then a `redfish` adapter covering iDRAC and iLO power,
+media, and serial, which is high value and standards-based enough to move
+quickly. AMT after that, with the proprietary graphical consoles (iDRAC, iLO,
+and AMT's own) as a later push once the standards-based groundwork is in place.
 
 A first pass at the `redfish` adapter (`flashdk_adapters::redfish`) now exists,
 covering `Power` (via `#ComputerSystem.Reset`) and `VirtualMedia` (via

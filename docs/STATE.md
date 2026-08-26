@@ -13,7 +13,7 @@ settled adapters, and the open questions, once they're answered.
 | PiKVM | Live, verified | Live, verified reads; actions implemented but never exercised (this unit has no ATX controller attached) | Live, verified | TLS with trust-on-first-use pinning; see [security.md](security.md) |
 | NanoKVM | Live, verified | Live, verified | Live, verified | Cleartext HTTP; see [security.md](security.md) for what that means in practice |
 | JetKVM | Live, verified over WebRTC | Not implemented | Not implemented | The `rpc` JSON-RPC channel works (verified with `getLocalVersion`), but the method names and payload shapes for power and virtual media haven't been captured off the wire yet |
-| GL.iNet | No adapter | No adapter | No adapter | The project doesn't own a unit. Nothing here is written from documentation alone; see [CLEANROOM.md](../CLEANROOM.md) |
+| GL.iNet | Live, verified (key/mouse/wheel/paste all confirmed against the real API) | Live API accepted (`power`/`power_long`/`reset` all return `ok:true`); no host attached to the capture port, so no downstream effect observed yet | Live, verified reads; mount/connect not exercised (no image available on this fresh unit) | Turns out to run the `kvmd` daemon stack itself, confirmed via its own `/api/info`; its own login-and-token auth, not PiKVM's static headers. See [captures/glinet-comet-kvmd-api.md](captures/glinet-comet-kvmd-api.md) |
 
 "Verified" means exercised against a real, owned device and the result checked, not
 just compiled. Every adapter also carries unit tests pinning its wire encoders to the

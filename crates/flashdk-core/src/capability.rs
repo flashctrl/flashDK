@@ -12,8 +12,10 @@ pub enum Vendor {
     NanoKvm,
     PiKvm,
     JetKvm,
-    /// GL.iNet Comet: untested, we don't own the hardware yet. Present so the type
-    /// is complete, but no adapter ships until we've probed a real unit.
+    /// GL.iNet Comet. Runs the `kvmd` daemon stack (confirmed live via its own
+    /// `/api/info`, the same family PiKVM runs), with its own login-and-token auth
+    /// flow rather than PiKVM's static per-request headers; see
+    /// `flashdk_adapters::glinet` and `docs/captures/glinet-comet-kvmd-api.md`.
     GlInet,
 }
 

@@ -4,12 +4,13 @@
 //! real device. Every line here is derived from **wire observation and official docs
 //! only**, never from any vendor's source. See `CLEANROOM.md`.
 //!
-//! Status: PiKVM and NanoKVM have live HID + power + virtual media; JetKVM has live HID
-//! over WebRTC (power/media over its JSON-RPC channel are pending). The [`Kvm`] enum
-//! below is the vendor-neutral entry point apps hold.
+//! Status: PiKVM, NanoKVM, and GL.iNet's Comet have live HID + power + virtual
+//! media; JetKVM has live HID over WebRTC (power/media over its JSON-RPC channel
+//! are pending). The [`Kvm`] enum below is the vendor-neutral entry point apps hold.
 
 #![allow(async_fn_in_trait)]
 
+pub mod glinet;
 pub mod jetkvm;
 pub mod nanokvm;
 pub mod nut;
@@ -24,12 +25,13 @@ use flashdk_core::{Capabilities, Device, DeviceInfo, Result, TransportKind};
 
 /// Runtime polymorphism across vendors without `dyn`. The app holds a `Kvm` and calls
 /// methods on it; each call fans out to the concrete adapter inside. Adding a vendor
-/// means adding a variant and four `match` arms; the compiler makes sure you don't
-/// forget one.
+/// means adding a variant and one match arm per method; the compiler makes sure you
+/// don't forget one.
 pub enum Kvm {
     NanoKvm(nanokvm::NanoKvm),
     PiKvm(pikvm::PiKvm),
     JetKvm(jetkvm::JetKvm),
+    GlInet(glinet::GlInetKvm),
 }
 
 impl Kvm {
@@ -39,6 +41,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.info(),
             Kvm::PiKvm(a) => a.info(),
             Kvm::JetKvm(a) => a.info(),
+            Kvm::GlInet(a) => a.info(),
         }
     }
 
@@ -48,6 +51,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.capabilities(),
             Kvm::PiKvm(a) => a.capabilities(),
             Kvm::JetKvm(a) => a.capabilities(),
+            Kvm::GlInet(a) => a.capabilities(),
         }
     }
 
@@ -57,6 +61,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.transport_kind(),
             Kvm::PiKvm(a) => a.transport_kind(),
             Kvm::JetKvm(a) => a.transport_kind(),
+            Kvm::GlInet(a) => a.transport_kind(),
         }
     }
 
@@ -67,6 +72,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.key(event).await,
             Kvm::PiKvm(a) => a.key(event).await,
             Kvm::JetKvm(a) => a.key(event).await,
+            Kvm::GlInet(a) => a.key(event).await,
         }
     }
 
@@ -75,6 +81,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.absolute_mouse(m).await,
             Kvm::PiKvm(a) => a.absolute_mouse(m).await,
             Kvm::JetKvm(a) => a.absolute_mouse(m).await,
+            Kvm::GlInet(a) => a.absolute_mouse(m).await,
         }
     }
 
@@ -83,6 +90,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.relative_mouse(m).await,
             Kvm::PiKvm(a) => a.relative_mouse(m).await,
             Kvm::JetKvm(a) => a.relative_mouse(m).await,
+            Kvm::GlInet(a) => a.relative_mouse(m).await,
         }
     }
 
@@ -91,6 +99,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.wheel(w).await,
             Kvm::PiKvm(a) => a.wheel(w).await,
             Kvm::JetKvm(a) => a.wheel(w).await,
+            Kvm::GlInet(a) => a.wheel(w).await,
         }
     }
 
@@ -101,6 +110,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.action(action).await,
             Kvm::PiKvm(a) => a.action(action).await,
             Kvm::JetKvm(a) => a.action(action).await,
+            Kvm::GlInet(a) => a.action(action).await,
         }
     }
 
@@ -109,6 +119,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.state().await,
             Kvm::PiKvm(a) => a.state().await,
             Kvm::JetKvm(a) => a.state().await,
+            Kvm::GlInet(a) => a.state().await,
         }
     }
 
@@ -117,6 +128,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.list().await,
             Kvm::PiKvm(a) => a.list().await,
             Kvm::JetKvm(a) => a.list().await,
+            Kvm::GlInet(a) => a.list().await,
         }
     }
 
@@ -126,6 +138,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.mount(name).await,
             Kvm::PiKvm(a) => a.mount(name).await,
             Kvm::JetKvm(a) => a.mount(name).await,
+            Kvm::GlInet(a) => a.mount(name).await,
         }
     }
 
@@ -135,6 +148,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.unmount().await,
             Kvm::PiKvm(a) => a.unmount().await,
             Kvm::JetKvm(a) => a.unmount().await,
+            Kvm::GlInet(a) => a.unmount().await,
         }
     }
 
@@ -144,6 +158,7 @@ impl Kvm {
             Kvm::NanoKvm(a) => a.paste_text(text).await,
             Kvm::PiKvm(a) => a.paste_text(text).await,
             Kvm::JetKvm(a) => a.paste_text(text).await,
+            Kvm::GlInet(a) => a.paste_text(text).await,
         }
     }
 }
