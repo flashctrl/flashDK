@@ -5,7 +5,12 @@
 //! the `/api/hid/events/` endpoints; power uses `/api/atx`; virtual media `/api/msd`.
 //! Auth is the header scheme (`X-KVMD-User` / `X-KVMD-Passwd`) on every request.
 
-mod keymap;
+// `pub(crate)` rather than private: `glinet` reuses this table unchanged, since it
+// maps between two public standards (USB HID usage IDs and W3C `KeyboardEvent.code`
+// strings) that both devices' `kvmd`-family backends expect identically; see
+// `glinet/PROVENANCE.md` for why sharing this table doesn't cross any clean-room
+// line (it's flashDK's own code, derived from public specs, not vendor source).
+pub(crate) mod keymap;
 
 use std::sync::Arc;
 
