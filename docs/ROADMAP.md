@@ -72,9 +72,29 @@ sourced yet: the exact SOAP envelope shape WS-Management itself expects
 (WS-Management is its own DMTF standard, DSP0226/DSP0227, not yet read
 directly) and the redirection-port authentication handshake's byte-level
 framing, both needed before code can be written, not just documentation.
-This project also has no vPro-capable hardware on hand to verify against once
-built. Status: **sourced, not started**, the tier before Redfish was in prior
-to this session's work.
+
+**Protocol-version wrinkle, worth flagging before probing any real host:**
+WS-Management wasn't part of AMT from the start. The project's one real
+vPro-capable unit on hand reports AMT 1.2, which predates WS-Management
+entirely; sourcing above (`CIM_PowerManagementService`, WS-Management framing)
+applies to AMT 3.0 and later, which is what the overwhelming majority of
+currently-deployed vPro hardware actually runs, and is where this adapter's
+near-term effort stays targeted. Older AMT generations (1.x/2.x) used a
+different, Intel-proprietary SOAP schema on the same ports rather than
+WS-Management, so a capture against the 1.2 unit would tell us about that
+older dialect, not the one most users have. Two open-source tools exist that
+speak to older/varied AMT generations (`amttool`, part of the `openhpi`/ELRepo
+lineage, and [sdague/amt](https://github.com/sdague/amt) on GitHub); both are
+noted here only as evidence that the protocol genuinely forked across AMT
+versions, not as a source: both are GPL-licensed and neither has been opened
+or read, per [CLEANROOM.md](../CLEANROOM.md). If the 1.2 unit ever gets
+probed, it needs its own from-scratch capture and its own PROVENANCE.md
+entry, kept separate from the WS-Management-based work above rather than
+blended into it.
+
+This project also has no AMT 3.0+ hardware on hand to verify the sourced work
+above against. Status: **sourced, not started**, the tier before Redfish was
+in prior to this session's work.
 
 ### Why these are a good fit
 
@@ -175,3 +195,39 @@ UPS actually supports). The existing `Power` trait continues to cover
 whole-machine ATX control; outlets and UPS telemetry are additive capabilities
 behind their own flags, keeping the single capability-negotiated model
 consistent across KVMs, BMCs, PDUs, and UPS devices.
+
+## Planned: hypervisor and NAS host control
+
+A fourth device class: not a KVM, BMC, PDU, or UPS, but still "controllable
+infrastructure" in the same sense, and a natural fit once flashDK already
+models power and virtual media as capability traits rather than KVM-specific
+concepts. Both entries below run on hardware this project already has on
+hand (the same Dell OptiPlex used as JetKVM's redirection target runs
+Proxmox), so once scoped, these are buildable against a real, owned host
+rather than only against documentation.
+
+### Proxmox VE
+
+Proxmox VE's own REST API is officially documented (`pve-docs`, published by
+Proxmox Server Solutions GmbH) and covers per-VM/container power actions
+(start/stop/shutdown/reset), console access proxied through its own
+noVNC/SPICE/xterm.js gateway, and host-level status. Proxmox VE itself is
+AGPL-3.0-licensed, so the same clean-room discipline applies as everywhere
+else in this project: build from the published API documentation, never from
+Proxmox's own source, to keep flashDK's Apache-2.0 license intact. The
+per-VM model (many power-controllable "machines" behind one host, rather than
+one machine per adapter instance) doesn't map onto `Device`/`Kvm` the way a
+single-target KVM does, so this likely needs its own thin collection type
+rather than forcing a single `Power` impl per Proxmox node. Not sourced yet.
+
+### Unraid
+
+Unraid exposes host control (array start/stop, VM and container power
+actions, and increasingly a documented GraphQL API on recent releases)
+alongside its more traditional web UI. Unraid itself is closed-source, so
+unlike Proxmox this one depends entirely on what Unraid publishes as official
+API documentation; if the GraphQL schema (or its predecessor) is documented
+well enough to build against without reading Unraid's own code, this stays
+clean-room by the same rule as Redfish and NUT. Not sourced yet; needs a
+documentation pass before any code, the same way the UniFi PDU section above
+needed one before concluding it was blocked rather than built.
