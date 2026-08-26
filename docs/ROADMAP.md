@@ -40,6 +40,42 @@ which is worth surfacing honestly to a user rather than presenting a single
 "secure" state, consistent with how this SDK already treats transport security
 per vendor; see [security.md](security.md).
 
+**Sourced, not yet built.** Checked directly against Intel's own published
+documentation (the AMT SDK Implementation and Reference Guide and the AMT
+Developer's Guide), not any third-party write-up:
+
+- Power control is `CIM_PowerManagementService.RequestPowerStateChange`, a
+  WS-Management method taking a `PowerState` value and a reference to the
+  managed `CIM_ComputerSystem`. The always-supported values are documented
+  verbatim: 2 (Power Up), 5 (Power Cycle), 8 (Power Down), 10 (Reset), with
+  4 (Sleep-Deep), 7 (Hibernate), 12 (Power Off-Soft Graceful), and 14 (Master
+  Bus Reset Graceful) available "pending OS capabilities." `TimeoutPeriod`
+  only accepts `0`; `Time` isn't supported at all, both explicitly called out
+  in the method's own documented caveats.
+- KVM redirection needs to be switched on first via a separate WS-Management
+  setting (`IPS_KVMRedirectionSettingData`) before a session can connect at
+  all; this isn't optional plumbing, Intel's own docs describe it as a
+  precondition.
+- Once enabled, video/HID rides RFB (an IETF-documented protocol family) over
+  Intel's own redirection ports: 16994 plaintext / 16995 TLS speak a
+  vendor-extended "RFB 4.0," while the standard RFB 3.8 is available on the
+  IANA VNC port 5900 if separately enabled with its own password. Ports
+  16992/16993 (TLS) carry the authentication handshake for the redirection
+  ports.
+
+Every fact above traces to Intel's own SDK documentation, most of it read via
+the Internet Archive's Wayback Machine after `software.intel.com` (the
+original host) started returning HTTP 403 to automated fetches; the archived
+pages are still Intel's own published text, not a third party's summary of
+it, so this stays within [CLEANROOM.md](../CLEANROOM.md)'s bar. What isn't
+sourced yet: the exact SOAP envelope shape WS-Management itself expects
+(WS-Management is its own DMTF standard, DSP0226/DSP0227, not yet read
+directly) and the redirection-port authentication handshake's byte-level
+framing, both needed before code can be written, not just documentation.
+This project also has no vPro-capable hardware on hand to verify against once
+built. Status: **sourced, not started**, the tier before Redfish was in prior
+to this session's work.
+
 ### Why these are a good fit
 
 Power, virtual media, and serial are more standardized here, through Redfish,
