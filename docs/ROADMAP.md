@@ -67,14 +67,36 @@ toward "controllable infrastructure" more broadly.
 
 ### Ubiquiti UniFi PDU
 
-Controlled through the UniFi Network controller API, either a self-hosted
-controller or a UniFi OS console such as a Dream Machine or Cloud Key. Modern
-UniFi OS (4.x) exposes a local API-key REST API, with outlet on/off/cycle done
-through per-outlet device management overrides; the older path is a controller
-session login followed by a `rest/device` PATCH. This fits a `PowerOutlet`
-capability: enumerate outlets, switch them, and read per-outlet metering on
-models that support it. UniFi's API is documented well enough to implement to
-the documented surface directly, and it's TLS-pinnable.
+**Checked and corrected:** the earlier version of this section assumed outlet
+control was reachable through official, documented per-outlet overrides. It
+isn't, at least not yet. Ubiquiti's official Network Integration API (the
+published OpenAPI schema at `developer.ui.com/network`, checked at v10.4.57)
+has no PDU concept anywhere in it: a device's `features` enum is exactly
+`switching`, `accessPoint`, `gateway`, and its `interfaces` enum is exactly
+`ports`, `radios`. No `outlet`, no `relay`, no `pdu`, in either the paths or
+the component schemas. The two device-control primitives that do exist are a
+generic per-device `RESTART` action and a per-port `POWER_CYCLE` action (aimed
+at cycling PoE power on a switch port), neither of which is outlet-specific
+PDU control.
+
+What outlet-level control the PDU almost certainly has comes from the older,
+undocumented internal Controller API (a `rest/device` PATCH with an
+`outlet_overrides` field, per community reverse-engineering, not Ubiquiti's
+own documentation). Building against that would mean sourcing the adapter
+from community write-ups whose own provenance traces back to observing or
+decompiling the controller's behavior, which doesn't clear the bar
+[CLEANROOM.md](../CLEANROOM.md) sets: wire observation against a device this
+project owns, or official documentation, not someone else's write-up of
+either. This project doesn't own a UniFi PDU to probe directly yet, so
+there's nothing to build against cleanly in either direction right now.
+
+**Status: blocked**, not on hardware, but on there being no clean-room-safe
+source for outlet control at all until either Ubiquiti documents it
+officially or a unit is available to probe the wire directly (which would
+then be a legitimate, capture-based path, the same one every KVM adapter
+took). The generic `RESTART` and `POWER_CYCLE` actions are officially
+documented and could support a narrower, honest adapter later if a PDU or a
+UniFi switch is on hand to confirm they apply the way the schema implies.
 
 ### APC Back-UPS 1500
 
