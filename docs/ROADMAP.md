@@ -58,6 +58,15 @@ value and standards-based enough to move quickly. AMT after that, with the
 proprietary graphical consoles (iDRAC, iLO, and AMT's own) as a later push once
 the standards-based groundwork is in place.
 
+A first pass at the `redfish` adapter (`flashdk_adapters::redfish`) now exists,
+covering `Power` (via `#ComputerSystem.Reset`) and `VirtualMedia` (via
+`#VirtualMedia.InsertMedia`/`EjectMedia`), built directly from the official
+DSP8010 JSON Schema bundle and corroborated against DSP0266 for the session-login
+handshake; see `crates/flashdk-adapters/src/redfish/PROVENANCE.md`. Serial console
+over Redfish is not implemented yet. This project has no iDRAC or iLO to test
+against, so the whole adapter is compiled-and-unit-tested, not verified live; see
+[STATE.md](STATE.md).
+
 ## Planned: power infrastructure (PDU and UPS)
 
 A third device class beyond KVMs and BMCs. Neither a PDU nor a UPS has HID or
