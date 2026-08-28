@@ -16,7 +16,7 @@ jobs:
     # applies to conformIT's own dependencies. Re-verify and re-pin
     # deliberately when you want the latest version, don't switch to
     # @main to avoid doing that.
-    uses: almadon/conformIT/.github/workflows/reusable-audit.yml@v2
+    uses: almadon/conformIT/.github/workflows/reusable-audit.yml@v3
     with:
       # One `owner/repo` per line; list more than one to audit several
       # repos in the same run. Leaving `targets` unset does NOT default
