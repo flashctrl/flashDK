@@ -74,11 +74,20 @@ Every fact above traces to Intel's own SDK documentation, most of it read via
 the Internet Archive's Wayback Machine after `software.intel.com` (the
 original host) started returning HTTP 403 to automated fetches; the archived
 pages are still Intel's own published text, not a third party's summary of
-it, so this stays within [CLEANROOM.md](../CLEANROOM.md)'s bar. What isn't
-sourced yet: the exact SOAP envelope shape WS-Management itself expects
-(WS-Management is its own DMTF standard, DSP0226/DSP0227, not yet read
-directly) and the redirection-port authentication handshake's byte-level
-framing, both needed before code can be written, not just documentation.
+it, so this stays within [CLEANROOM.md](../CLEANROOM.md)'s bar.
+
+**The WS-Management SOAP envelope itself is now sourced too**, directly from
+three official DMTF specifications downloaded and read in full: DSP0226
+(WS-Management), DSP0227 (WS-Management CIM Binding), and DSP0230 (WS-CIM
+Mapping). `flashdk_adapters::amt::protocol` builds and unit-tests the full
+envelope for `RequestPowerStateChange` (headers, `wsa:Action` URIs, and the
+`_INPUT` body shape) against those specs' own literal rules and worked
+examples; see `crates/flashdk-adapters/src/amt/PROVENANCE.md` for exactly
+which fact traces to which document and clause. What isn't sourced yet: the
+redirection-port authentication handshake's byte-level framing, and the
+literal `CIM_PowerManagementService` XML namespace string (a well-grounded
+inference from DSP0227's naming rule, not yet independently confirmed), both
+flagged explicitly in that PROVENANCE.md rather than treated as settled.
 
 **Protocol-version wrinkle, worth flagging before probing any real host:**
 WS-Management wasn't part of AMT from the start. The project's one real
@@ -100,8 +109,11 @@ entry, kept separate from the WS-Management-based work above rather than
 blended into it.
 
 This project also has no AMT 3.0+ hardware on hand to verify the sourced work
-above against. Status: **sourced, not started**, the tier before Redfish was
-in prior to this session's work.
+above against. Status: **sourced, partially built**. The pure SOAP-envelope
+layer (`flashdk_adapters::amt::protocol`) exists and is unit-tested against
+the specs' own text, the same "protocol first" approach the NUT adapter took
+before its live TCP client existed. There is no HTTP transport or
+authentication yet, and nothing has been exercised against a real device.
 
 ### Why these are a good fit
 
