@@ -4,7 +4,7 @@ Working notes for flashDK itself. Delete or rewrite the sections below once they
 longer reflect a moving target: the per-vendor picture, once all four vendors have
 settled adapters, and the open questions, once they're answered.
 
-**Last updated:** 2026-08-26.
+**Last updated:** 2026-08-28.
 
 ## What is true right now, per vendor
 
@@ -75,11 +75,24 @@ project has neither an iDRAC nor an iLO unit on hand. Serial console over
 Redfish isn't implemented yet, and each vendor's own graphical console (a
 separate, proprietary layer per `docs/ROADMAP.md`) is out of scope entirely.
 
+## Beyond KVMs: enterprise BMCs (Intel AMT)
+
+`flashdk_adapters::amt::protocol` builds and unit-tests the WS-Management SOAP
+envelope for `CIM_PowerManagementService.RequestPowerStateChange`, sourced
+directly from three official DMTF specifications read in full (DSP0226,
+DSP0227, DSP0230), on top of the `PowerState` value semantics already sourced
+from Intel's own AMT SDK docs. See
+`crates/flashdk-adapters/src/amt/PROVENANCE.md`. This is protocol-layer only:
+no HTTP transport, no Digest/Kerberos auth, and nothing exercised against a
+real device. The project's one real vPro-capable unit reports AMT 1.2, which
+predates WS-Management entirely, so even once hardware access resumes, this
+specific work needs an AMT 3.0+ unit to verify against; see
+`docs/ROADMAP.md`'s "Protocol-version wrinkle" note.
+
 ## What is not built yet
 
 - **JetKVM power and virtual media.** The transport is live and the `rpc` channel
   works; only the specific method names and argument shapes remain uncaptured.
-- **A GL.iNet adapter.** Blocked on hardware, not on anything technical.
 - **A UniFFI layer.** Nothing generates Swift or Kotlin bindings yet; the crates are
   Rust-only consumers today (see the example binaries under
   `crates/flashdk-adapters/examples/`).

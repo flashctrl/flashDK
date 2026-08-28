@@ -10,6 +10,7 @@
 
 #![allow(async_fn_in_trait)]
 
+pub mod amt;
 pub mod glinet;
 pub mod jetkvm;
 pub mod nanokvm;
