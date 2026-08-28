@@ -1,0 +1,32 @@
+name: conform audit
+
+on:
+  schedule:
+    - cron: "0 13 * * 1" # weekly; change to taste
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    # Pinned to a tag, not @main: conformIT's own security-posture.md
+    # rule 8 argues against a floating dependency, and that applies to
+    # conformIT as a dependency of your workflow just as much as it
+    # applies to conformIT's own dependencies. Re-verify and re-pin
+    # deliberately when you want the latest version, don't switch to
+    # @main to avoid doing that.
+    uses: almadon/conformIT/.github/workflows/reusable-audit.yml@v1
+    with:
+      # One `owner/repo` per line; list more than one to audit several
+      # repos in the same run. Leaving `targets` unset does NOT default
+      # to auditing this repo: it falls back to conformIT's OWN
+      # registry/targets.yaml instead. Set this explicitly.
+      targets: |
+        - flashctrl/flashDK
+      reporting_repo: flashctrl/flashDK-reporting
+    secrets:
+      # Name this whatever you like; it just has to match a real secret
+      # in this repo's own settings.
+      reporting_token: ${{ secrets.CONFORM_REPORTING_TOKEN }}
+
