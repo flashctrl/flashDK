@@ -46,6 +46,43 @@ pub fn mouse_abs(buttons: u8, x: u16, y: u16, wheel: i8) -> [u8; 10] {
     ]
 }
 
+/// One image in JetKVM's on-device storage, from a `listStorageFiles` result
+/// (`{"files":[{"filename":..,"size":..,"createdAt":..}]}`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageFile {
+    pub filename: String,
+    pub size: u64,
+}
+
+/// Parse a `listStorageFiles` result. Entries without a string `filename` are skipped.
+pub fn parse_storage_files(result: &serde_json::Value) -> Vec<StorageFile> {
+    result["files"]
+        .as_array()
+        .map(|files| {
+            files
+                .iter()
+                .filter_map(|f| {
+                    Some(StorageFile {
+                        filename: f["filename"].as_str()?.to_string(),
+                        size: f["size"].as_u64().unwrap_or(0),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Filename currently mounted, from a `getVirtualMediaState` result (`null` when
+/// nothing is mounted, else an object carrying `filename`).
+pub fn parse_mounted_filename(result: &serde_json::Value) -> Option<String> {
+    result["filename"].as_str().map(str::to_string)
+}
+
+/// Params for `mountWithStorage` as observed: `{"filename":..,"mode":"CDROM"}`.
+pub fn mount_with_storage_params(filename: &str) -> serde_json::Value {
+    serde_json::json!({ "filename": filename, "mode": "CDROM" })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,6 +106,42 @@ mod tests {
         assert_eq!(
             mouse_abs(0, 3672, 32767, 0),
             [0x03, 0, 0x00, 0x0e, 0x58, 0x00, 0x00, 0x7f, 0xff, 0x00]
+        );
+    }
+
+    #[test]
+    fn storage_list_matches_capture() {
+        let v: serde_json::Value = serde_json::from_str(
+            r#"{"files":[{"filename":"OPNsense-26.1.2-dvd-amd64.iso","size":2207027200,"createdAt":"2026-04-13T22:04:27.786719896Z"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_storage_files(&v),
+            vec![StorageFile {
+                filename: "OPNsense-26.1.2-dvd-amd64.iso".into(),
+                size: 2207027200
+            }]
+        );
+    }
+
+    #[test]
+    fn mounted_state_matches_capture() {
+        let mounted: serde_json::Value = serde_json::from_str(
+            r#"{"source":"Storage","mode":"CDROM","filename":"OPNsense-26.1.2-dvd-amd64.iso","size":2207027200}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_mounted_filename(&mounted).as_deref(),
+            Some("OPNsense-26.1.2-dvd-amd64.iso")
+        );
+        assert_eq!(parse_mounted_filename(&serde_json::Value::Null), None);
+    }
+
+    #[test]
+    fn mount_params_match_capture() {
+        assert_eq!(
+            mount_with_storage_params("a.iso").to_string(),
+            r#"{"filename":"a.iso","mode":"CDROM"}"#
         );
     }
 }

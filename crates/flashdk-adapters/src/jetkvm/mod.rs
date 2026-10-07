@@ -8,8 +8,9 @@
 //! (docs/captures/jetkvm-datachannel-hid.md), never from device source.
 //!
 //! HID is live: [`JetKvm::connect`] logs in, brings up the peer connection, and
-//! keyboard/mouse are sent as `wire` frames over the data channels. Power and virtual
-//! media (which use the `rpc` JSON-RPC channel) are not wired yet.
+//! keyboard/mouse are sent as `wire` frames over the data channels. Virtual media rides
+//! the `rpc` JSON-RPC channel (docs/captures/jetkvm-rpc-virtual-media.md). Power
+//! (ATX/DC extensions) is not wired yet.
 
 mod transport;
 mod wire;
@@ -39,10 +40,8 @@ impl JetKvm {
     /// Log in and establish the WebRTC connection to `host` (e.g. "10.0.10.21").
     pub async fn connect(host: impl Into<String>, password: &str) -> Result<Self> {
         let host = host.into();
-        let http = reqwest::Client::builder()
-            .cookie_store(true) // carry the authToken cookie into signaling
-            .build()
-            .map_err(|e| Error::Transport(e.to_string()))?;
+        // cookie store carries the authToken cookie into signaling
+        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
 
         let body = serde_json::json!({ "password": password }).to_string();
         let resp = http
@@ -156,7 +155,7 @@ impl Hid for JetKvm {
     }
 }
 
-// Power and virtual media use the JSON-RPC `rpc` channel; not wired yet.
+// Power rides the JSON-RPC `rpc` channel via the ATX/DC extensions; not captured yet.
 impl Power for JetKvm {
     async fn action(&self, _action: PowerAction) -> Result<()> {
         Err(Error::NotImplemented)
@@ -168,12 +167,37 @@ impl Power for JetKvm {
 
 impl VirtualMedia for JetKvm {
     async fn list(&self) -> Result<Vec<MediaImage>> {
-        Err(Error::NotImplemented)
+        let files = self
+            .transport
+            .rpc_call("listStorageFiles", serde_json::json!({}))
+            .await?;
+        let state = self
+            .transport
+            .rpc_call("getVirtualMediaState", serde_json::json!({}))
+            .await?;
+        let mounted = wire::parse_mounted_filename(&state);
+        Ok(wire::parse_storage_files(&files)
+            .into_iter()
+            .map(|f| MediaImage {
+                mounted: mounted.as_deref() == Some(f.filename.as_str()),
+                name: f.filename,
+                size: Some(f.size),
+            })
+            .collect())
     }
-    async fn mount(&self, _name: &str) -> Result<()> {
-        Err(Error::NotImplemented)
+
+    /// Mounts a stored image as a CD/DVD (the only mode captured so far).
+    async fn mount(&self, name: &str) -> Result<()> {
+        self.transport
+            .rpc_call("mountWithStorage", wire::mount_with_storage_params(name))
+            .await
+            .map(|_| ())
     }
+
     async fn unmount(&self) -> Result<()> {
-        Err(Error::NotImplemented)
+        self.transport
+            .rpc_call("unmountImage", serde_json::json!({}))
+            .await
+            .map(|_| ())
     }
 }
