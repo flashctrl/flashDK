@@ -128,6 +128,27 @@ port. Through the adapter: an absolute move to (24000, 20000) of 0..32767 put th
 guest cursor at about 73% across / 61% down of the 1920x1280 frame, matching the
 requested fraction, so the device uses the same 0..32767 absolute convention. A move
 onto the EULA screen's "I agree" button followed by a left-button press and release
-advanced the installer to its target-disk page. A `Tab` key press (usage 0x2B) showed
-no visible focus change in the installer, so keyboard delivery is still unconfirmed,
-not disproven (the installer may not draw a focus ring). Power actions were not sent.
+advanced the installer to its target-disk page. A lone `Tab` press showed no visible focus
+change (the installer draws no focus ring), which was inconclusive on its own.
+
+## Keyboard and virtual media on a real target (2026-10-07, firmware 4.82)
+
+- **Keyboard confirmed.** Left-Ctrl + Left-Alt + F3 (usages 0xE0, 0xE2, 0x3C) switched
+  the Proxmox installer to its debug console, and typed text (letters, `;`, `,`, `-`,
+  Enter) ran as shell commands, so key events land and modifiers combine.
+- **Host view of virtual media.** `lsblk` on the target showed the mounted ISO as an
+  "Optical Drive" (`sr0`, mounted at `/cdrom`) and an empty "Flash Drive" (`sdb`, 0B).
+- **`GET /api/msd` shape.** `drive.image` is an object (`name`, `size`, `complete`,
+  `in_storage`, ...) or null, not a string; `drive.connected`/`drive.cdrom` give the
+  mount state, and a separate `drive_partition` block exists. The adapter had read it
+  as a string and always reported "not mounted"; fixed with a test pinned to this shape.
+- **Mount and upload verified at the API level** with the target powered off:
+  `POST /api/msd/write?image=` (raw body) uploaded a 900 KiB ISO, `set_params`
+  plus `set_connected=1` mounted it and moved the mounted marker, `set_connected=0`
+  unmounted, `POST /api/msd/remove?image=` deleted it (the list lags removal by a
+  few seconds). Host-visible effect of *swapping* images was not observed, because the
+  target was off (no ATX board, so it can't be powered back on remotely).
+- **Power state is unreliable without ATX.** `/api/atx` reported `powered: false`
+  while the machine was running.
+- A plain `poweroff` fails in the installer shell (no systemd); `sync; poweroff -f`
+  worked.

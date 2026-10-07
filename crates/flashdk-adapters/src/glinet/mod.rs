@@ -329,19 +329,7 @@ impl Power for GlInetKvm {
 impl VirtualMedia for GlInetKvm {
     async fn list(&self) -> Result<Vec<MediaImage>> {
         let r = self.get("/api/msd").await?;
-        let current = r["drive"]["image"].as_str();
-        let connected = r["drive"]["connected"].as_bool().unwrap_or(false);
-        let mut out = Vec::new();
-        if let Some(images) = r["storage"]["images"].as_object() {
-            for (name, info) in images {
-                out.push(MediaImage {
-                    name: name.clone(),
-                    size: info["size"].as_u64(),
-                    mounted: connected && current == Some(name.as_str()),
-                });
-            }
-        }
-        Ok(out)
+        Ok(parse_media(&r))
     }
 
     async fn mount(&self, name: &str) -> Result<()> {
@@ -353,5 +341,50 @@ impl VirtualMedia for GlInetKvm {
     async fn unmount(&self) -> Result<()> {
         self.post("/api/msd/set_connected", &[("connected", "0")])
             .await
+    }
+}
+
+/// Turn a `/api/msd` result into the image list. `drive.image` is an object carrying
+/// `name` (observed 2026-10-07 on firmware 4.82), or null when nothing is selected.
+fn parse_media(r: &serde_json::Value) -> Vec<MediaImage> {
+    let current = r["drive"]["image"]["name"].as_str();
+    let connected = r["drive"]["connected"].as_bool().unwrap_or(false);
+    r["storage"]["images"]
+        .as_object()
+        .map(|images| {
+            images
+                .iter()
+                .map(|(name, info)| MediaImage {
+                    name: name.clone(),
+                    size: info["size"].as_u64(),
+                    mounted: connected && current == Some(name.as_str()),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn media_state_matches_capture() {
+        let mounted: serde_json::Value = serde_json::from_str(
+            r#"{"drive":{"cdrom":true,"connected":true,"image":{"complete":true,"in_storage":true,"name":"proxmox-ve_9.2-1.iso","size":1706178560},"rw":false},
+                "storage":{"images":{"proxmox-ve_9.2-1.iso":{"complete":true,"size":1706178560}}}}"#,
+        )
+        .unwrap();
+        let list = parse_media(&mounted);
+        assert_eq!(list.len(), 1);
+        assert!(list[0].mounted);
+        assert_eq!(list[0].size, Some(1706178560));
+
+        let idle: serde_json::Value = serde_json::from_str(
+            r#"{"drive":{"connected":false,"image":null},
+                "storage":{"images":{"proxmox-ve_9.2-1.iso":{"size":1706178560}}}}"#,
+        )
+        .unwrap();
+        assert!(!parse_media(&idle)[0].mounted);
     }
 }
