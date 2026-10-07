@@ -16,3 +16,11 @@ documentation only**. No source code from any third-party project or SDK was rea
 No GPL/copyleft source (kvmd, NanoKVM, JetKVM, GL.iNet firmware) or any SDK was consulted
 to write this adapter. Interface facts (endpoint paths, field names, RPC method names) were
 recorded from the wire, not from source.
+
+## Addendum 2026-10-07: virtual media over `rpc`
+`listStorageFiles`, `getVirtualMediaState`, `mountWithStorage` (`mode: "CDROM"`) and
+`unmountImage` were observed on the `rpc` DataChannel by wrapping the page's
+`RTCDataChannel.send` while the official web client was used against an owned device.
+See docs/captures/jetkvm-rpc-virtual-media.md. The device's frontend bundle was not
+read. Only the CD/DVD storage-mount path is covered; URL mount, disk mode, and upload
+are not captured. Power (ATX/DC extensions) remains uncaptured.

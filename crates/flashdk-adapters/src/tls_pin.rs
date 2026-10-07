@@ -170,9 +170,33 @@ pub fn tofu_client(host: &str, store: Arc<dyn PinStore>) -> Result<reqwest::Clie
         .map_err(|e| e.to_string())
 }
 
+/// A cookie-carrying `reqwest::Client` for cleartext HTTP devices. The crate builds
+/// reqwest without a default crypto provider, so even a client that never speaks TLS
+/// must be handed one explicitly or `build()` panics.
+pub fn plain_client() -> Result<reqwest::Client, String> {
+    let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|e| e.to_string())?
+    .with_root_certificates(rustls::RootCertStore::empty())
+    .with_no_client_auth();
+
+    reqwest::Client::builder()
+        .use_preconfigured_tls(config)
+        .cookie_store(true)
+        .build()
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_client_builds_without_a_global_provider() {
+        plain_client().expect("client must build with an explicit provider");
+    }
 
     #[test]
     fn memory_store_roundtrip() {

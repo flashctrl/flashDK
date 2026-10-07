@@ -4,7 +4,7 @@ Working notes for flashDK itself. Delete or rewrite the sections below once they
 longer reflect a moving target: the per-vendor picture, once all four vendors have
 settled adapters, and the open questions, once they're answered.
 
-**Last updated:** 2026-08-28.
+**Last updated:** 2026-10-07.
 
 ## What is true right now, per vendor
 
@@ -12,7 +12,7 @@ settled adapters, and the open questions, once they're answered.
 |---|---|---|---|---|
 | PiKVM | Live, verified | Live, verified reads; actions implemented but never exercised (this unit has no ATX controller attached) | Live, verified | TLS with trust-on-first-use pinning; see [security.md](security.md) |
 | NanoKVM | Live, verified | Live, verified | Live, verified | Cleartext HTTP; see [security.md](security.md) for what that means in practice |
-| JetKVM | Live, verified over WebRTC | Not implemented | Not implemented | The `rpc` JSON-RPC channel works (verified with `getLocalVersion`), but the method names and payload shapes for power and virtual media haven't been captured off the wire yet |
+| JetKVM | Live, verified over WebRTC | Not implemented (ATX/DC extension methods uncaptured) | Live, verified (list/mount CD-ROM/unmount via `rpc`; URL mount, disk mode, upload not captured) | The `rpc` JSON-RPC channel works (verified with `getLocalVersion`), but the method names and payload shapes for power and virtual media haven't been captured off the wire yet |
 | GL.iNet | Live, verified (key/mouse/wheel/paste all confirmed against the real API) | Live API accepted (`power`/`power_long`/`reset` all return `ok:true`); no host attached to the capture port, so no downstream effect observed yet | Live, verified reads; mount/connect not exercised (no image available on this fresh unit) | Turns out to run the `kvmd` daemon stack itself, confirmed via its own `/api/info`; its own login-and-token auth, not PiKVM's static headers. See [captures/glinet-comet-kvmd-api.md](captures/glinet-comet-kvmd-api.md) |
 
 "Verified" means exercised against a real, owned device and the result checked, not
@@ -91,8 +91,10 @@ specific work needs an AMT 3.0+ unit to verify against; see
 
 ## What is not built yet
 
-- **JetKVM power and virtual media.** The transport is live and the `rpc` channel
-  works; only the specific method names and argument shapes remain uncaptured.
+- **JetKVM power.** Virtual media is done (see
+  [captures/jetkvm-rpc-virtual-media.md](captures/jetkvm-rpc-virtual-media.md)). Power
+  lives behind the ATX/DC extensions, which must be loaded before use; the load and
+  action methods are uncaptured, and this unit's ATX hardware status is unconfirmed.
 - **A UniFFI layer.** Nothing generates Swift or Kotlin bindings yet; the crates are
   Rust-only consumers today (see the example binaries under
   `crates/flashdk-adapters/examples/`).
