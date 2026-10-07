@@ -50,3 +50,35 @@ loading an extension and for the ATX power actions remain uncaptured.
 Keystrokes sent in the browser while the video element has focus go to the target.
 A single `Escape` opened the Steam sidebar on the Bazzite machine during this
 capture.
+
+## Addendum 2026-10-07 (later): upload, Disk mode, and a signaling change
+
+Observed the same way (page-side hook on `RTCDataChannel.send` and `XMLHttpRequest`),
+still no frontend source read.
+
+- **Disk mode:** `mountWithStorage` with `{"filename":"flashdk-test.iso","mode":"Disk"}`,
+  same call as CD-ROM with `mode` changed; the device then pushed `usbState` `default`
+  then `configured` as the gadget re-enumerated.
+- **Upload:** `{"method":"startStorageFileUpload","params":{"filename":"flashdk-test2.iso","size":65536}}`
+  returns `{"alreadyUploadedBytes":0,"dataChannel":"upload_<uuid>"}`. The client then
+  `POST /storage/upload?uploadId=upload_<uuid>` with the raw file as the body (a Blob,
+  no custom headers set by the page) and gets `200 {"message":"Upload completed"}`.
+  The `alreadyUploadedBytes` field suggests resumable uploads; not exercised. A
+  `dataChannel` name is returned too; whether bytes can also go over it is unobserved.
+- **Not captured:** URL mount (needs a reachable URL; none was hosted), deleting a
+  stored file (no delete control found in the UI), WoL send, ATX/DC extension load.
+
+### Signaling moved (firmware 0.5.9)
+
+After the device's version went from `0.5.9-dev202606301105` to `0.5.9`, `POST
+/webrtc/session` returned 404 even with a valid session cookie, while the browser
+still connected with no HTTP signaling request at all. Probing with an upgrade
+request found `GET /webrtc/signaling/client` answering `101 Switching Protocols`;
+other candidate paths fell through to the web UI page. On that WebSocket the device
+speaks first: `{"data":{"deviceVersion":"0.5.9"},"type":"device-metadata"}`. The
+adapter sends `{"type":"offer","data":{"sd":"<base64 of {type,sdp}>"}}` (the same
+base64 wrapper as the old HTTP body) and receives `{"type":"answer","data":"<base64>"}`
+with `data` a plain string. The offer envelope worked on the first attempt; it is
+the one part inferred from the device's own `{type,data}` framing plus the earlier
+wrapper rather than seen in a captured browser frame (the browser's frames could not be
+hooked: the page opens its socket before any injected script can run).

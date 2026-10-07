@@ -54,8 +54,16 @@ impl JetKvm {
         if !resp.status().is_success() {
             return Err(Error::Auth(format!("login failed: HTTP {}", resp.status())));
         }
+        let cookie = resp
+            .headers()
+            .get_all(reqwest::header::SET_COOKIE)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .filter_map(|v| v.split(';').next())
+            .collect::<Vec<_>>()
+            .join("; ");
 
-        let transport = transport::connect(http, &host).await?;
+        let transport = transport::connect(&cookie, &host).await?;
 
         // Best-effort: read the app version over the rpc channel for DeviceInfo.
         let firmware = transport
