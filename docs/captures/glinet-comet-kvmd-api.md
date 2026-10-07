@@ -120,3 +120,14 @@ specific device. `/api/msd/set_connected` (the actual mount step) has only
 been exercised against a degenerate test file and failed server-side (see
 above); a real image and an observable "host sees the drive" check remain
 outstanding.
+
+## Observed effect on a real target (2026-10-07)
+
+A host (a machine booted into the Proxmox VE installer) was attached to the capture
+port. Through the adapter: an absolute move to (24000, 20000) of 0..32767 put the
+guest cursor at about 73% across / 61% down of the 1920x1280 frame, matching the
+requested fraction, so the device uses the same 0..32767 absolute convention. A move
+onto the EULA screen's "I agree" button followed by a left-button press and release
+advanced the installer to its target-disk page. A `Tab` key press (usage 0x2B) showed
+no visible focus change in the installer, so keyboard delivery is still unconfirmed,
+not disproven (the installer may not draw a focus ring). Power actions were not sent.
