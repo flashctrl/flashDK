@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use flashdk_adapters::jetkvm::JetKvm;
 use flashdk_core::hid::{AbsMouse, Hid};
+use flashdk_core::media::VirtualMedia;
 use flashdk_core::Device;
 
 #[tokio::main]
@@ -35,6 +36,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match kvm.local_version().await {
         Ok(v) => println!("rpc getLocalVersion -> {v}"),
         Err(e) => println!("rpc getLocalVersion failed: {e}"),
+    }
+
+    let images = kvm.list().await?;
+    println!("virtual media images: {images:?}");
+    if std::env::var("JETKVM_MOUNT_TEST").is_ok() {
+        if let Some(img) = images.first() {
+            kvm.mount(&img.name).await?;
+            println!("mounted {} -> {:?}", img.name, kvm.list().await?);
+            kvm.unmount().await?;
+            println!("unmounted -> {:?}", kvm.list().await?);
+        }
     }
 
     println!("Moving mouse to center (16384,16384) on the target…");
