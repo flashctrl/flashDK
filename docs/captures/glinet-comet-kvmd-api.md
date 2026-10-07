@@ -146,8 +146,14 @@ change (the installer draws no focus ring), which was inconclusive on its own.
   `POST /api/msd/write?image=` (raw body) uploaded a 900 KiB ISO, `set_params`
   plus `set_connected=1` mounted it and moved the mounted marker, `set_connected=0`
   unmounted, `POST /api/msd/remove?image=` deleted it (the list lags removal by a
-  few seconds). Host-visible effect of *swapping* images was not observed, because the
-  target was off (no ATX board, so it can't be powered back on remotely).
+  few seconds). The host-visible effect of
+  swapping images is covered by the next bullet.
+- **Image swap with the host running, observed (later the same day).** With the target
+  booted into the installed Proxmox, `lsblk` showed `sr0` as a 1.66G "Optical Drive"
+  (label PVE). After uploading a 900 KiB test ISO and mounting it via the API, `sr0`
+  reappeared as 900K with the new volume label, with no reboot or replug on the host,
+  and `sdb` ("Flash Drive") stayed at 0B. Re-mounting the original image restored
+  `sr0` to 1.66G / PVE.
 - **Power state is unreliable without ATX.** `/api/atx` reported `powered: false`
   while the machine was running.
 - A plain `poweroff` fails in the installer shell (no systemd); `sync; poweroff -f`
