@@ -91,7 +91,7 @@ impl JetTransport {
 
 /// Establish the WebRTC connection to `host` (already-authenticated `http` client for
 /// signaling), returning a handle once the `hidrpc` channel is open.
-pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> {
+pub async fn connect(cookie: &str, host: &str) -> Result<JetTransport> {
     // 1) Bind the media socket and determine our routable local address.
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| Error::Transport(e.to_string()))?;
     socket
@@ -114,8 +114,7 @@ pub async fn connect(http: reqwest::Client, host: &str) -> Result<JetTransport> 
         .ok_or_else(|| Error::Protocol("no offer produced".into()))?;
 
     // 3) Exchange SDP with the device and accept the answer.
-    let base_url = format!("http://{host}");
-    let answer_sdp = exchange_sdp(&http, &base_url, &offer.to_sdp_string()).await?;
+    let answer_sdp = exchange_sdp(host, cookie, &offer.to_sdp_string()).await?;
     let answer = str0m::change::SdpAnswer::from_sdp_string(&answer_sdp)
         .map_err(|e| Error::Protocol(format!("bad answer SDP: {e}")))?;
     rtc.sdp_api()
@@ -276,54 +275,76 @@ fn dispatch_rpc(
     }
 }
 
-/// Exchange an SDP offer with the device and return its SDP answer.
+/// Exchange an SDP offer with the device over its signaling WebSocket and return the
+/// SDP answer.
 ///
-/// JetKVM's `POST /webrtc/session` body is a JSON object `{"sd": "<base64>"}` where the
-/// base64 decodes to a JSON session description `{"type","sdp"}`; the reply is the same
-/// shape carrying the answer. (Established by probing plus live iteration; see
-/// docs/captures/jetkvm-datachannel-hid.md.)
-pub async fn exchange_sdp(
-    http: &reqwest::Client,
-    base_url: &str,
-    offer_sdp: &str,
-) -> Result<String> {
+/// Observed 2026-10-07 on firmware 0.5.9: `GET /webrtc/signaling/client` upgrades to a
+/// WebSocket (101) and the device speaks first with
+/// `{"data":{"deviceVersion":"0.5.9"},"type":"device-metadata"}`. The earlier
+/// `POST /webrtc/session` route now returns 404.
+pub async fn exchange_sdp(host: &str, cookie: &str, offer_sdp: &str) -> Result<String> {
     use base64::Engine;
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio_tungstenite::tungstenite::Message;
+
     let b64 = base64::engine::general_purpose::STANDARD;
+    let mut req = format!("ws://{host}/webrtc/signaling/client")
+        .into_client_request()
+        .map_err(|e| Error::Transport(e.to_string()))?;
+    req.headers_mut().insert(
+        "Cookie",
+        cookie
+            .parse()
+            .map_err(|_| Error::Protocol("bad cookie header".into()))?,
+    );
+    req.headers_mut().insert(
+        "Origin",
+        format!("http://{host}")
+            .parse()
+            .map_err(|_| Error::Protocol("bad origin".into()))?,
+    );
+    let (mut ws, _) = tokio_tungstenite::connect_async(req)
+        .await
+        .map_err(|e| Error::Transport(format!("signaling websocket: {e}")))?;
 
     let inner = serde_json::json!({ "type": "offer", "sdp": offer_sdp }).to_string();
-    let body = serde_json::json!({ "sd": b64.encode(inner) }).to_string();
+    let offer = serde_json::json!({ "type": "offer", "data": { "sd": b64.encode(inner) } });
+    ws.send(Message::Text(offer.to_string()))
+        .await
+        .map_err(|e| Error::Transport(e.to_string()))?;
 
-    let resp = http
-        .post(format!("{base_url}/webrtc/session"))
-        .header("Content-Type", "application/json")
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| Error::Transport(e.to_string()))?;
-    let status = resp.status();
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| Error::Transport(e.to_string()))?;
-    if !status.is_success() {
-        return Err(Error::Protocol(format!(
-            "signaling failed: HTTP {status}: {}",
-            text.chars().take(200).collect::<String>()
-        )));
+    let mut seen: Vec<String> = Vec::new();
+    let deadline = tokio::time::sleep(std::time::Duration::from_secs(10));
+    tokio::pin!(deadline);
+    loop {
+        tokio::select! {
+            _ = &mut deadline => {
+                return Err(Error::Protocol(format!("no answer; saw {seen:?}")));
+            }
+            msg = ws.next() => {
+                let Some(Ok(Message::Text(t))) = msg else {
+                    return Err(Error::Protocol(format!("signaling closed; saw {seen:?}")));
+                };
+                seen.push(t.chars().take(300).collect());
+                let v: serde_json::Value = match serde_json::from_str(&t) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if v["type"] == "answer" {
+                    if let Some(sd) = v["data"].as_str() {
+                        let decoded = b64
+                            .decode(sd.trim())
+                            .map_err(|e| Error::Protocol(format!("answer not base64: {e}")))?;
+                        let inner: serde_json::Value = serde_json::from_slice(&decoded)
+                            .map_err(|e| Error::Protocol(e.to_string()))?;
+                        return inner["sdp"]
+                            .as_str()
+                            .map(str::to_string)
+                            .ok_or_else(|| Error::Protocol("answer missing 'sdp'".into()));
+                    }
+                }
+            }
+        }
     }
-
-    let outer: serde_json::Value =
-        serde_json::from_str(&text).map_err(|e| Error::Protocol(e.to_string()))?;
-    let sd = outer["sd"]
-        .as_str()
-        .ok_or_else(|| Error::Protocol("answer missing 'sd'".into()))?;
-    let decoded = b64
-        .decode(sd.trim())
-        .map_err(|e| Error::Protocol(format!("answer 'sd' not base64: {e}")))?;
-    let inner: serde_json::Value =
-        serde_json::from_slice(&decoded).map_err(|e| Error::Protocol(e.to_string()))?;
-    inner["sdp"]
-        .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| Error::Protocol("answer missing 'sdp'".into()))
 }
