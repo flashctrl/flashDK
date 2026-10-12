@@ -13,10 +13,12 @@ flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 # through our own rustls config (see tls_pin.rs) for TOFU cert pinning, so a single
 # rustls stack is all this crate needs (simpler license/audit surface, and no
 # OpenSSL to cross-compile for mobile later).
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
     "json",
     "cookies",
-    "rustls-tls-manual-roots-no-provider",
+    "form",
+    "query",
+    "rustls-no-provider",
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

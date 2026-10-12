@@ -22,7 +22,7 @@ nothing but the standard library, so there is nothing here to audit.
 | Crate | Used for | Licence |
 |---|---|---|
 | `flashdk-core` | The workspace's own vendor-neutral crate | Apache-2.0 |
-| `reqwest` | HTTP client (PiKVM, NanoKVM, JetKVM signaling) | MIT OR Apache-2.0 |
+| `reqwest` | HTTP client (PiKVM, NanoKVM, JetKVM signaling), 0.13 | MIT OR Apache-2.0 |
 | `serde` / `serde_json` | Wire-format (de)serialization | MIT OR Apache-2.0 |
 | `rustls` | TLS, underlying PiKVM's trust-on-first-use pinning | Apache-2.0 OR ISC OR MIT |
 | `aws-lc-rs` | `rustls`'s cryptographic provider | ISC AND (Apache-2.0 OR ISC) |
