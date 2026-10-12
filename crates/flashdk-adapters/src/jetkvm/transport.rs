@@ -100,7 +100,7 @@ pub async fn connect(cookie: &str, host: &str) -> Result<JetTransport> {
     let local_addr = routable_local_addr(host, &socket)?;
 
     // 2) Build the offerer Rtc: add our host candidate, then the data channels.
-    let mut rtc = Rtc::new();
+    let mut rtc = Rtc::new(Instant::now());
     let candidate =
         Candidate::host(local_addr, Protocol::Udp).map_err(|e| Error::Transport(e.to_string()))?;
     rtc.add_local_candidate(candidate);
