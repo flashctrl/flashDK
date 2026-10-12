@@ -67,9 +67,7 @@ impl NanoKvm {
         let host = host.into();
         let base_url = format!("http://{host}");
 
-        let http = reqwest::Client::builder()
-            .build()
-            .map_err(|e| Error::Transport(e.to_string()))?;
+        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
         let token = auth::login(&http, &base_url, username, password).await?;
 
         // Open the HID WebSocket, authenticating with the token cookie.
@@ -123,7 +121,7 @@ impl NanoKvm {
 
     async fn send(&self, bytes: Vec<u8>) -> Result<()> {
         let mut sink = self.ws.lock().await;
-        sink.send(Message::Binary(bytes))
+        sink.send(Message::Binary(bytes.into()))
             .await
             .map_err(|e| Error::Transport(e.to_string()))
     }

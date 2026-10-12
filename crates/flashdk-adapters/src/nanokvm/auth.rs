@@ -7,13 +7,12 @@
 //! obfuscation, not real security: it rides over plaintext HTTP unless the device is
 //! configured for TLS.
 
-use aes::cipher::{block_padding::Pkcs7, generic_array::GenericArray, BlockEncryptMut, KeyIvInit};
+use aes::cipher::{block_padding::Pkcs7, BlockModeEncrypt, KeyIvInit};
 use aes::Aes256;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use flashdk_core::{Error, Result};
 use md5::{Digest, Md5};
-use rand::RngCore;
 
 /// The passphrase baked into NanoKVM's frontend bundle (public knowledge).
 const PASSPHRASE: &[u8] = b"nanokvm-sipeed-2024";
@@ -42,14 +41,12 @@ fn evp_bytes_to_key(passphrase: &[u8], salt: &[u8]) -> ([u8; 32], [u8; 16]) {
 /// URL-encoded value to place in the login request's `password` field.
 pub fn encrypt_password(password: &str) -> String {
     let mut salt = [0u8; 8];
-    rand::thread_rng().fill_bytes(&mut salt);
+    rand::fill(&mut salt);
     let (key, iv) = evp_bytes_to_key(PASSPHRASE, &salt);
 
-    let cipher = cbc::Encryptor::<Aes256>::new(
-        GenericArray::from_slice(&key),
-        GenericArray::from_slice(&iv),
-    );
-    let ciphertext = cipher.encrypt_padded_vec_mut::<Pkcs7>(password.as_bytes());
+    let cipher = cbc::Encryptor::<Aes256>::new_from_slices(&key, &iv)
+        .expect("EVP_BytesToKey yields a 32-byte key and 16-byte IV");
+    let ciphertext = cipher.encrypt_padded_vec::<Pkcs7>(password.as_bytes());
 
     // OpenSSL envelope: "Salted__" + salt + ciphertext, base64-encoded.
     let mut blob = Vec::with_capacity(16 + ciphertext.len());
@@ -99,5 +96,31 @@ pub async fn login(
     match parsed.data {
         Some(d) if parsed.code == 0 => Ok(d.token),
         _ => Err(Error::Auth("invalid username or password".into())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aes::cipher::BlockModeDecrypt;
+
+    /// The salt is random, so pin the property instead: the output must be the OpenSSL
+    /// "Salted__" envelope and decrypt back to the password under the derived key.
+    #[test]
+    fn encrypted_password_round_trips() {
+        let encoded = encrypt_password("hunter2 + /=");
+        let b64 = encoded
+            .replace("%2B", "+")
+            .replace("%2F", "/")
+            .replace("%3D", "=");
+        let blob = STANDARD.decode(b64).unwrap();
+        assert_eq!(&blob[..8], b"Salted__");
+
+        let (key, iv) = evp_bytes_to_key(PASSPHRASE, &blob[8..16]);
+        let plain = cbc::Decryptor::<Aes256>::new_from_slices(&key, &iv)
+            .unwrap()
+            .decrypt_padded_vec::<Pkcs7>(&blob[16..])
+            .unwrap();
+        assert_eq!(plain, b"hunter2 + /=");
     }
 }

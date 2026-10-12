@@ -310,7 +310,7 @@ pub async fn exchange_sdp(host: &str, cookie: &str, offer_sdp: &str) -> Result<S
 
     let inner = serde_json::json!({ "type": "offer", "sdp": offer_sdp }).to_string();
     let offer = serde_json::json!({ "type": "offer", "data": { "sd": b64.encode(inner) } });
-    ws.send(Message::Text(offer.to_string()))
+    ws.send(Message::Text(offer.to_string().into()))
         .await
         .map_err(|e| Error::Transport(e.to_string()))?;
 
