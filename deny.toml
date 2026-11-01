@@ -35,7 +35,13 @@ yanked = "deny"
 # Ignore specific advisories only with a written justification. Vulnerabilities are
 # never ignored here; any entry must be a non-vulnerability (unmaintained) notice in a
 # transitive dep we don't control, with no safe upgrade available.
-ignore = []
+ignore = [
+    # basic-toml: unmaintained (not vulnerable), pulled via uniffi -> askama_derive, a
+    # build-time proc-macro used for binding code generation. It is never linked into
+    # the shipped library. No safe upgrade exists upstream. Revisit when uniffi/askama
+    # move off it.
+    "RUSTSEC-2026-0374",
+]
 
 # --- Dependency bans: no wildcard version requirements (supply-chain hygiene).
 # Our own workspace path deps are exempt via allow-wildcard-paths. ---
