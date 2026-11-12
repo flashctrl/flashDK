@@ -258,6 +258,6 @@ offered for them, since both redirect or refuse plain HTTP by default and that i
 unverified here. Tested against loopback TLS servers (pin on first contact, same cert
 accepted, changed cert refused with no downgrade); **not yet run against a device**,
 and our NanoKVM has HTTPS off, so its TLS path cannot be checked on it. The FFI has not
-been updated; it lives on `feat/uniffi-android`.
+been updated here; the FFI (`flashdk-ffi`) now exposes the policy, `security()` and a NanoKVM token connect. Verified live on a NanoKVM with HTTPS enabled (RequireTls and PreferTls connect and pin; CleartextOnly gets `TlsRequired` from its redirect).
 
 **What would justify revisiting:** vendors enabling TLS by default.

@@ -12,7 +12,7 @@ use flashdk_adapters::glinet::GlInetKvm;
 use flashdk_adapters::jetkvm::JetKvm;
 use flashdk_adapters::nanokvm::NanoKvm;
 use flashdk_adapters::pikvm::PiKvm;
-use flashdk_adapters::tls_pin::{Fingerprint, PinStore as CorePinStore};
+use flashdk_adapters::tls_pin::{Fingerprint, MemoryPinStore, PinStore as CorePinStore};
 use flashdk_core::hid::{AbsMouse, Hid, KeyCode, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::VirtualMedia;
 use flashdk_core::power::Power;
@@ -45,6 +45,9 @@ pub enum FlashError {
     InvalidArgument {
         detail: String,
     },
+    /// The device only accepts HTTPS but a cleartext policy was requested. Offer the user
+    /// `RequireTls` or `PreferTls`.
+    TlsRequired,
 }
 
 impl fmt::Display for FlashError {
@@ -56,6 +59,7 @@ impl fmt::Display for FlashError {
             Self::Transport { detail } => write!(f, "transport error: {detail}"),
             Self::Protocol { detail } => write!(f, "protocol error: {detail}"),
             Self::InvalidArgument { detail } => write!(f, "invalid argument: {detail}"),
+            Self::TlsRequired => write!(f, "the device requires HTTPS"),
         }
     }
 }
@@ -71,6 +75,11 @@ impl From<flashdk_core::Error> for FlashError {
             E::Auth(detail) => Self::Auth { detail },
             E::Transport(detail) => Self::Transport { detail },
             E::Protocol(detail) => Self::Protocol { detail },
+            E::TlsRequired => Self::TlsRequired,
+            // `Error` is non-exhaustive: report variants added later as a protocol error.
+            other => Self::Protocol {
+                detail: other.to_string(),
+            },
         }
     }
 }
@@ -172,6 +181,54 @@ pub struct MediaImage {
     pub mounted: bool,
 }
 
+/// Whether a connection may use HTTPS, cleartext, or both. `RequireTls` is the safe
+/// default: use it unless the user knowingly chose otherwise. Most KVMs ship with
+/// HTTPS off, so a stock device needs `PreferTls` or `CleartextOnly`.
+///
+/// `PreferTls` tries HTTPS first and uses cleartext only when nothing answered on the
+/// HTTPS port. It never falls back after a certificate or handshake failure, nor for a
+/// device whose certificate is already pinned. PiKVM and GL.iNet are HTTPS-only:
+/// `CleartextOnly` is rejected for them with `NotSupported`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum TlsPolicy {
+    RequireTls,
+    PreferTls,
+    CleartextOnly,
+}
+
+impl From<TlsPolicy> for flashdk_core::TlsPolicy {
+    fn from(p: TlsPolicy) -> Self {
+        match p {
+            TlsPolicy::RequireTls => Self::RequireTls,
+            TlsPolicy::PreferTls => Self::PreferTls,
+            TlsPolicy::CleartextOnly => Self::CleartextOnly,
+        }
+    }
+}
+
+/// How the live connection is secured. Show a warning for `Cleartext`.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ConnectionSecurity {
+    /// TLS; `pinned` is the SHA-256 fingerprint of the pinned certificate (32 bytes),
+    /// if any. Persist it through your `PinStore` and show it for verification.
+    Tls {
+        pinned: Option<Vec<u8>>,
+    },
+    Cleartext,
+}
+
+impl From<flashdk_core::ConnectionSecurity> for ConnectionSecurity {
+    fn from(s: flashdk_core::ConnectionSecurity) -> Self {
+        match s {
+            flashdk_core::ConnectionSecurity::Tls { pinned } => Self::Tls {
+                pinned: pinned.map(|p| p.to_vec()),
+            },
+            // Non-exhaustive upstream: anything unknown is reported as the weaker case.
+            _ => Self::Cleartext,
+        }
+    }
+}
+
 // --- TLS pin persistence, supplied by the app (Keystore / Keychain) ---
 
 /// Implemented in Kotlin/Swift. Fingerprints are 32-byte SHA-256 values.
@@ -220,37 +277,72 @@ macro_rules! dispatch {
 #[derive(uniffi::Object)]
 pub struct Kvm(Inner);
 
-/// Connect and authenticate. `username` is ignored by JetKVM, which has only a
-/// password. `pin_store` persists TLS pins for PiKVM and GL.iNet; pass `None` to pin
-/// in memory for this session only.
+fn core_store(pin_store: Option<Arc<dyn PinStore>>) -> Arc<dyn CorePinStore> {
+    match pin_store {
+        Some(s) => Arc::new(ForeignPins(s)),
+        None => Arc::new(MemoryPinStore::default()),
+    }
+}
+
+/// Connect and authenticate with a username and password. `username` is ignored by
+/// JetKVM, which has only a password. `pin_store` persists TLS pins; pass `None` to
+/// pin in memory for this session only. Persist pins for real use, or every launch
+/// trusts whatever certificate it sees first.
+///
+/// NanoKVM password login is unavailable and returns `NotSupported`: use
+/// [`connect_nanokvm_with_token`].
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn connect(
     vendor: Vendor,
     host: String,
     username: String,
     password: String,
+    tls_policy: TlsPolicy,
     pin_store: Option<Arc<dyn PinStore>>,
 ) -> Result<Arc<Kvm>> {
-    let store = pin_store.map(|s| Arc::new(ForeignPins(s)) as Arc<dyn CorePinStore>);
+    let policy: flashdk_core::TlsPolicy = tls_policy.into();
+    let store = core_store(pin_store);
     let inner = match vendor {
         Vendor::NanoKvm => Inner::Nano(NanoKvm::connect(host, &username, &password).await?),
-        Vendor::JetKvm => Inner::Jet(JetKvm::connect(host, &password).await?),
+        Vendor::JetKvm => Inner::Jet(JetKvm::connect(host, &password, policy, store).await?),
         Vendor::PiKvm => {
-            let kvm = match store {
-                Some(s) => PiKvm::with_pin_store(host, username, password, s)?,
-                None => PiKvm::new(host, username, password)?,
-            };
-            // `new` makes no network call; this is the first authenticated request, so
-            // bad credentials or an unreachable host surface here rather than later.
+            https_only(tls_policy, "PiKVM")?;
+            let kvm = PiKvm::with_pin_store(host, username, password, store)?;
+            // The constructor makes no network call; this is the first authenticated
+            // request, so bad credentials or an unreachable host surface here.
             kvm.refresh_identity().await?;
             Inner::Pi(kvm)
         }
-        Vendor::GlInet => Inner::Gl(match store {
-            Some(s) => GlInetKvm::connect_with_pin_store(&host, &username, &password, s).await?,
-            None => GlInetKvm::connect(&host, &username, &password).await?,
-        }),
+        Vendor::GlInet => {
+            https_only(tls_policy, "GL.iNet")?;
+            Inner::Gl(GlInetKvm::connect_with_pin_store(&host, &username, &password, store).await?)
+        }
     };
     Ok(Arc::new(Kvm(inner)))
+}
+
+/// Connect to a NanoKVM with the session token from its own web sign-in (the value of
+/// the `nano-kvm-token` cookie). Tokens expire: on `Auth`, ask the user to sign in again.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn connect_nanokvm_with_token(
+    host: String,
+    token: String,
+    tls_policy: TlsPolicy,
+    pin_store: Option<Arc<dyn PinStore>>,
+) -> Result<Arc<Kvm>> {
+    let kvm =
+        NanoKvm::connect_with_token(host, &token, tls_policy.into(), core_store(pin_store)).await?;
+    Ok(Arc::new(Kvm(Inner::Nano(kvm))))
+}
+
+/// PiKVM and GL.iNet speak HTTPS only; refuse a request that demands cleartext.
+fn https_only(policy: TlsPolicy, vendor: &'static str) -> Result<()> {
+    if policy == TlsPolicy::CleartextOnly {
+        return Err(FlashError::NotSupported {
+            what: format!("{vendor} is HTTPS-only; CleartextOnly is not available"),
+        });
+    }
+    Ok(())
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -267,6 +359,11 @@ impl Kvm {
 
     pub fn capabilities(&self) -> Capabilities {
         dispatch!(self, d => d.capabilities()).into()
+    }
+
+    /// How this connection is actually secured; warn the user on `Cleartext`.
+    pub fn security(&self) -> ConnectionSecurity {
+        dispatch!(self, d => d.security()).into()
     }
 
     // Power
@@ -334,5 +431,49 @@ impl Kvm {
     /// Type `text` as key events (US layout; unreachable characters are skipped).
     pub async fn paste_text(&self, text: String) -> Result<()> {
         Ok(dispatch!(self, d => d.paste_text(&text).await)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn https_only_vendors_reject_cleartext_only() {
+        assert!(matches!(
+            https_only(TlsPolicy::CleartextOnly, "PiKVM"),
+            Err(FlashError::NotSupported { .. })
+        ));
+        assert!(https_only(TlsPolicy::RequireTls, "PiKVM").is_ok());
+        assert!(https_only(TlsPolicy::PreferTls, "PiKVM").is_ok());
+    }
+
+    #[test]
+    fn policy_and_security_cross_the_boundary_faithfully() {
+        assert_eq!(
+            flashdk_core::TlsPolicy::from(TlsPolicy::PreferTls),
+            flashdk_core::TlsPolicy::PreferTls
+        );
+        let pinned = ConnectionSecurity::from(flashdk_core::ConnectionSecurity::Tls {
+            pinned: Some([7; 32]),
+        });
+        assert_eq!(
+            pinned,
+            ConnectionSecurity::Tls {
+                pinned: Some(vec![7; 32])
+            }
+        );
+        assert_eq!(
+            ConnectionSecurity::from(flashdk_core::ConnectionSecurity::Cleartext),
+            ConnectionSecurity::Cleartext
+        );
+    }
+
+    #[test]
+    fn tls_required_maps_to_its_own_error() {
+        assert!(matches!(
+            FlashError::from(flashdk_core::Error::TlsRequired),
+            FlashError::TlsRequired
+        ));
     }
 }

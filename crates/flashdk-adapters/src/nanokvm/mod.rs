@@ -243,7 +243,7 @@ impl Device for NanoKvm {
             power_reset: true, // real reset line via GPIO (type "reset")
             virtual_media: true,
             wake_on_lan: false,
-            tls_pinnable: false,
+            tls_pinnable: true, // when HTTPS is enabled on the device
         }
     }
 
