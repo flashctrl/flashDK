@@ -22,7 +22,9 @@ uniffi::setup_scaffolding!();
 
 // --- Errors ---
 
-/// Mirrors `flashdk_core::Error`. Messages never contain credentials: the adapters
+/// Mirrors `flashdk_core::Error`. Fields are named `detail`, not `message`: the generated
+/// Kotlin exceptions already inherit a `message` property and would not compile.
+/// Details never contain credentials: the adapters
 /// only put device-side text and our own descriptions in them.
 #[derive(Debug, uniffi::Error)]
 pub enum FlashError {
@@ -31,17 +33,17 @@ pub enum FlashError {
     },
     NotImplemented,
     Auth {
-        message: String,
+        detail: String,
     },
     Transport {
-        message: String,
+        detail: String,
     },
     Protocol {
-        message: String,
+        detail: String,
     },
     /// Raised by this layer for malformed arguments (for example a pin that isn't 32 bytes).
     InvalidArgument {
-        message: String,
+        detail: String,
     },
 }
 
@@ -50,10 +52,10 @@ impl fmt::Display for FlashError {
         match self {
             Self::NotSupported { what } => write!(f, "capability not supported: {what}"),
             Self::NotImplemented => write!(f, "not implemented yet"),
-            Self::Auth { message } => write!(f, "authentication error: {message}"),
-            Self::Transport { message } => write!(f, "transport error: {message}"),
-            Self::Protocol { message } => write!(f, "protocol error: {message}"),
-            Self::InvalidArgument { message } => write!(f, "invalid argument: {message}"),
+            Self::Auth { detail } => write!(f, "authentication error: {detail}"),
+            Self::Transport { detail } => write!(f, "transport error: {detail}"),
+            Self::Protocol { detail } => write!(f, "protocol error: {detail}"),
+            Self::InvalidArgument { detail } => write!(f, "invalid argument: {detail}"),
         }
     }
 }
@@ -66,9 +68,9 @@ impl From<flashdk_core::Error> for FlashError {
         match e {
             E::NotSupported(what) => Self::NotSupported { what: what.into() },
             E::NotImplemented => Self::NotImplemented,
-            E::Auth(message) => Self::Auth { message },
-            E::Transport(message) => Self::Transport { message },
-            E::Protocol(message) => Self::Protocol { message },
+            E::Auth(detail) => Self::Auth { detail },
+            E::Transport(detail) => Self::Transport { detail },
+            E::Protocol(detail) => Self::Protocol { detail },
         }
     }
 }
