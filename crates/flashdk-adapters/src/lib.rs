@@ -19,6 +19,7 @@ pub mod pikvm;
 pub mod redfish;
 pub mod scheme;
 pub mod tls_pin;
+pub mod wsconn;
 
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};

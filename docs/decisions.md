@@ -250,9 +250,14 @@ protect it.
 permissive default that keeps today's behaviour (leaves every new app unprotected);
 disabling certificate checks for self-signed devices (we pin instead, decision 2).
 
-**Status:** the policy types, the decision logic and `Device::security()` are in; PiKVM
-and GL.iNet report their pins. NanoKVM and JetKVM still connect over cleartext only and
-report it. Wiring the policy into their `connect` calls, including WebSocket over TLS,
-is the next step.
+**Status:** done for the adapters that can use both schemes. NanoKVM and JetKVM take the
+policy and a pin store in `connect`, open WebSockets over TLS with the same trust-on-first-use
+pinning as the REST clients (`wsconn.rs`), and report what they actually used through
+`Device::security()`. PiKVM and GL.iNet remain HTTPS-only: `CleartextOnly` is not
+offered for them, since both redirect or refuse plain HTTP by default and that is
+unverified here. Tested against loopback TLS servers (pin on first contact, same cert
+accepted, changed cert refused with no downgrade); **not yet run against a device**,
+and our NanoKVM has HTTPS off, so its TLS path cannot be checked on it. The FFI has not
+been updated; it lives on `feat/uniffi-android`.
 
 **What would justify revisiting:** vendors enabling TLS by default.

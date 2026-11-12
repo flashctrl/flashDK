@@ -13,19 +13,29 @@ use flashdk_core::capability::Vendor;
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};
 use flashdk_core::power::{Power, PowerAction, PowerState};
-use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::{
+    Capabilities, ConnectionSecurity, Device, DeviceInfo, Error, Result, TlsPolicy, TransportKind,
+};
 
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
-use std::sync::Mutex;
-use tokio::net::TcpStream;
+use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
+use crate::scheme::Scheme;
+use crate::tls_pin::{self, PinStore};
+use crate::wsconn::{connect_with_policy, open_ws, Attempt, WsStream};
 use wire::{mouse_frame, KeyboardState};
 
-type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+type WsSink = SplitSink<WsStream, Message>;
+
+fn base_url(scheme: Scheme, host: &str) -> String {
+    match scheme {
+        Scheme::Https => format!("https://{host}"),
+        Scheme::Http => format!("http://{host}"),
+    }
+}
 
 /// Last-known absolute cursor position, so wheel/button-only events can re-send it.
 #[derive(Default, Clone, Copy)]
@@ -38,6 +48,8 @@ struct MousePos {
 pub struct NanoKvm {
     host: String,
     base_url: String,
+    scheme: Scheme,
+    pins: Arc<dyn PinStore>,
     http: reqwest::Client,
     token: String,
     /// Firmware ("image") version read from /api/vm/info at connect, e.g. "v1.4.0".
@@ -86,56 +98,66 @@ impl NanoKvm {
     /// cookie value). `host` is e.g. "10.0.10.10". Tokens expire, so callers must
     /// handle `Auth` errors by asking the user to sign in again.
     ///
-    /// Uses plaintext `http`/`ws`; this device had no TLS listener when tested.
-    pub async fn connect_with_token(host: impl Into<String>, token: &str) -> Result<Self> {
+    /// `policy` picks HTTPS or cleartext (see [`TlsPolicy`]). NanoKVM ships with HTTPS
+    /// off, so a stock unit needs `PreferTls` or `CleartextOnly`; once HTTPS is
+    /// enabled on the device, certificates are pinned in `store` on first contact.
+    /// [`Device::security`] reports which one was actually used.
+    pub async fn connect_with_token(
+        host: impl Into<String>,
+        token: &str,
+        policy: TlsPolicy,
+        store: Arc<dyn PinStore>,
+    ) -> Result<Self> {
         let host = host.into();
         let token = token.to_string();
-        let base_url = format!("http://{host}");
 
-        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
+        let ((http, sink, firmware, scheme), _scheme) =
+            connect_with_policy(policy, &host, &store, |scheme| {
+                let host = host.clone();
+                let token = token.clone();
+                let store = store.clone();
+                async move {
+                    let cookie = format!("nano-kvm-token={token}");
+                    let http = match scheme {
+                        Scheme::Https => tls_pin::tofu_client(&host, store.clone()),
+                        Scheme::Http => tls_pin::plain_client(),
+                    }
+                    .map_err(|e| Attempt::fatal(Error::Transport(e)))?;
 
-        // Open the HID WebSocket, authenticating with the token cookie.
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        use tokio_tungstenite::tungstenite::http::header::COOKIE;
-        let mut req = format!("ws://{host}/api/ws")
-            .into_client_request()
-            .map_err(|e| Error::Transport(e.to_string()))?;
-        req.headers_mut().insert(
-            COOKIE,
-            format!("nano-kvm-token={token}")
-                .parse()
-                .map_err(|_| Error::Protocol("bad cookie header".into()))?,
-        );
-        let (stream, _resp) = tokio_tungstenite::connect_async(req).await.map_err(|e| {
-            use tokio_tungstenite::tungstenite::Error as WsError;
-            match &e {
-                // The upgrade is refused with 401 when the token is expired or wrong.
-                WsError::Http(resp) if resp.status() == 401 => {
-                    Error::Auth("session token rejected; sign in again".into())
+                    let stream = open_ws(
+                        scheme,
+                        &host,
+                        "/api/ws",
+                        &[("Cookie", cookie.clone())],
+                        &store,
+                    )
+                    .await?;
+                    let (sink, _read) = stream.split();
+
+                    // Best-effort: read the firmware/image version for DeviceInfo.
+                    let base = base_url(scheme, &host);
+                    let parsed = match http
+                        .get(format!("{base}/api/vm/info"))
+                        .header("Cookie", cookie)
+                        .send()
+                        .await
+                    {
+                        Ok(r) => r.json::<NkResponse>().await.ok(),
+                        Err(_) => None,
+                    };
+                    let firmware = parsed
+                        .and_then(|r| extract_image_version(&r.data))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    Ok((http, sink, firmware, scheme))
                 }
-                _ => Error::Transport(e.to_string()),
-            }
-        })?;
-        let (sink, _read) = stream.split();
-
-        // Best-effort: read the firmware/image version for DeviceInfo.
-        let vm_info = http
-            .get(format!("{base_url}/api/vm/info"))
-            .header("Cookie", format!("nano-kvm-token={token}"))
-            .send()
-            .await
-            .ok();
-        let mut parsed: Option<NkResponse> = None;
-        if let Some(r) = vm_info {
-            parsed = r.json::<NkResponse>().await.ok();
-        }
-        let firmware = parsed
-            .and_then(|r| extract_image_version(&r.data))
-            .unwrap_or_else(|| "unknown".to_string());
+            })
+            .await?;
 
         Ok(Self {
+            base_url: base_url(scheme, &host),
+            scheme,
+            pins: store,
             host,
-            base_url,
             http,
             token,
             firmware,
@@ -225,8 +247,13 @@ impl Device for NanoKvm {
         }
     }
 
-    fn security(&self) -> flashdk_core::ConnectionSecurity {
-        flashdk_core::ConnectionSecurity::Cleartext
+    fn security(&self) -> ConnectionSecurity {
+        match self.scheme {
+            Scheme::Https => ConnectionSecurity::Tls {
+                pinned: self.pins.get(&self.host),
+            },
+            Scheme::Http => ConnectionSecurity::Cleartext,
+        }
     }
 
     fn transport_kind(&self) -> TransportKind {
