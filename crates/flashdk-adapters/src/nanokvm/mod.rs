@@ -1,8 +1,12 @@
 //! NanoKVM PCIe adapter: REST for auth/aux, and a binary WebSocket (`/api/ws`) for
-//! live keyboard and mouse. Everything here is derived from wire observation
-//! (docs/captures/nanokvm-ws-hid.md, and the publicly-documented AES login).
+//! live keyboard and mouse, derived from wire observation
+//! (docs/captures/nanokvm-ws-hid.md).
+//!
+//! Password login is quarantined: it needed a secret that exists only in the vendor's
+//! web client, which CLEANROOM.md forbids reading. See PROVENANCE.md in this directory.
+//! A session token the user already holds can be supplied with
+//! [`NanoKvm::connect_with_token`].
 
-mod auth;
 mod wire;
 
 use flashdk_core::capability::Vendor;
@@ -59,18 +63,36 @@ fn extract_image_version(data: &serde_json::Value) -> Option<String> {
 }
 
 impl NanoKvm {
-    /// Log in and open the HID WebSocket. `host` is e.g. "10.0.10.10".
+    /// Password login is **not available** and always returns `NotSupported`, before
+    /// any network traffic.
     ///
-    /// Uses plaintext `http`/`ws` today; the device also offers TLS on 443, and a
-    /// later pass will prefer `wss` with certificate handling.
-    pub async fn connect(host: impl Into<String>, username: &str, password: &str) -> Result<Self> {
+    /// The device rejects a plain password, and the scheme it expects depends on a
+    /// secret that appears only in the vendor's web client, never on the wire or in
+    /// the vendor's documentation. We will not read that client, so we cannot
+    /// implement it. This returns when Sipeed documents the login or permits it in
+    /// writing. Until then, use [`Self::connect_with_token`].
+    pub async fn connect(
+        _host: impl Into<String>,
+        _username: &str,
+        _password: &str,
+    ) -> Result<Self> {
+        Err(Error::NotSupported(
+            "NanoKVM password login (no clean-room source; use connect_with_token)",
+        ))
+    }
+
+    /// Open the HID WebSocket with a session `token` the user already obtained by
+    /// signing in through the device's own web interface (the `nano-kvm-token`
+    /// cookie value). `host` is e.g. "10.0.10.10". Tokens expire, so callers must
+    /// handle `Auth` errors by asking the user to sign in again.
+    ///
+    /// Uses plaintext `http`/`ws`; this device had no TLS listener when tested.
+    pub async fn connect_with_token(host: impl Into<String>, token: &str) -> Result<Self> {
         let host = host.into();
+        let token = token.to_string();
         let base_url = format!("http://{host}");
 
-        let http = reqwest::Client::builder()
-            .build()
-            .map_err(|e| Error::Transport(e.to_string()))?;
-        let token = auth::login(&http, &base_url, username, password).await?;
+        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
 
         // Open the HID WebSocket, authenticating with the token cookie.
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -84,9 +106,16 @@ impl NanoKvm {
                 .parse()
                 .map_err(|_| Error::Protocol("bad cookie header".into()))?,
         );
-        let (stream, _resp) = tokio_tungstenite::connect_async(req)
-            .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+        let (stream, _resp) = tokio_tungstenite::connect_async(req).await.map_err(|e| {
+            use tokio_tungstenite::tungstenite::Error as WsError;
+            match &e {
+                // The upgrade is refused with 401 when the token is expired or wrong.
+                WsError::Http(resp) if resp.status() == 401 => {
+                    Error::Auth("session token rejected; sign in again".into())
+                }
+                _ => Error::Transport(e.to_string()),
+            }
+        })?;
         let (sink, _read) = stream.split();
 
         // Best-effort: read the firmware/image version for DeviceInfo.
@@ -345,5 +374,21 @@ mod tests {
     #[test]
     fn missing_image_field_is_none() {
         assert_eq!(extract_image_version(&serde_json::json!({})), None);
+    }
+}
+
+#[cfg(test)]
+mod quarantine_tests {
+    use super::*;
+
+    /// Password login must refuse before touching the network. `.invalid` can never
+    /// resolve, so any attempt to connect would surface as a Transport error instead.
+    #[tokio::test]
+    async fn password_login_is_not_supported() {
+        let err = NanoKvm::connect("nanokvm.invalid", "user", "pass")
+            .await
+            .err()
+            .expect("password login must not succeed");
+        assert!(matches!(err, Error::NotSupported(_)), "got {err:?}");
     }
 }

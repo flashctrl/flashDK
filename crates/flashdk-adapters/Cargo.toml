@@ -29,15 +29,11 @@ serde_json = "1"
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 sha2 = "0.10"
 
-# NanoKVM: WebSocket transport for its binary HID protocol, plus the RustCrypto
-# pieces to replicate its CryptoJS-compatible AES login (all permissive-licensed).
+# NanoKVM: WebSocket transport for its binary HID protocol. Password login is
+# quarantined (see nanokvm/PROVENANCE.md), so no login crypto is needed here.
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
-aes = "0.8"
-cbc = { version = "0.1", features = ["alloc"] }
-md-5 = "0.10"
 base64 = "0.22"
-rand = "0.8"
 tokio = { version = "1", features = ["sync", "net", "rt", "macros", "time", "io-util"] }
 
 # JetKVM: sans-IO WebRTC (MIT) for its DataChannel HID transport. We drive the UDP
