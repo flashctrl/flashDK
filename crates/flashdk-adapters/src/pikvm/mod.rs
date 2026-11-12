@@ -34,6 +34,9 @@ struct ApiResponse {
 /// A connected PiKVM.
 pub struct PiKvm {
     base_url: String,
+    /// Kept to report the pinned certificate through [`Device::security`].
+    host: String,
+    pins: Arc<dyn PinStore>,
     user: String,
     passwd: String,
     http: reqwest::Client,
@@ -70,9 +73,11 @@ impl PiKvm {
         store: Arc<dyn PinStore>,
     ) -> Result<Self> {
         let host = host.into();
-        let http = tls_pin::tofu_client(&host, store).map_err(Error::Transport)?;
+        let http = tls_pin::tofu_client(&host, store.clone()).map_err(Error::Transport)?;
         Ok(Self {
             base_url: format!("https://{host}"),
+            host,
+            pins: store,
             user: user.into(),
             passwd: passwd.into(),
             http,
@@ -199,6 +204,12 @@ impl Device for PiKvm {
         }
     }
 
+    fn security(&self) -> flashdk_core::ConnectionSecurity {
+        flashdk_core::ConnectionSecurity::Tls {
+            pinned: self.pins.get(&self.host),
+        }
+    }
+
     fn transport_kind(&self) -> TransportKind {
         TransportKind::RequestResponse
     }
@@ -300,5 +311,34 @@ impl VirtualMedia for PiKvm {
     async fn unmount(&self) -> Result<()> {
         self.post("/api/msd/set_connected", &[("connected", "0")])
             .await
+    }
+}
+
+#[cfg(test)]
+mod security_tests {
+    use super::*;
+    use crate::tls_pin::MemoryPinStore;
+    use flashdk_core::ConnectionSecurity;
+
+    /// `security()` reports TLS with whatever pin the store holds for the host, and makes
+    /// no network call (the constructor does none either).
+    #[test]
+    fn reports_tls_and_the_stored_pin() {
+        let store = Arc::new(MemoryPinStore::default());
+        let kvm = PiKvm::with_pin_store("10.0.0.5", "u", "p", store.clone()).unwrap();
+        assert_eq!(
+            kvm.security(),
+            ConnectionSecurity::Tls { pinned: None },
+            "no pin before first connect"
+        );
+
+        store.set("10.0.0.5", [7u8; 32]);
+        assert_eq!(
+            kvm.security(),
+            ConnectionSecurity::Tls {
+                pinned: Some([7u8; 32])
+            }
+        );
+        assert!(kvm.security().is_encrypted());
     }
 }

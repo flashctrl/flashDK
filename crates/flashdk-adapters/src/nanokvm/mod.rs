@@ -225,6 +225,10 @@ impl Device for NanoKvm {
         }
     }
 
+    fn security(&self) -> flashdk_core::ConnectionSecurity {
+        flashdk_core::ConnectionSecurity::Cleartext
+    }
+
     fn transport_kind(&self) -> TransportKind {
         TransportKind::RequestResponse
     }

@@ -16,6 +16,8 @@ bumps and dated entries begin at the first real release.
 
 ### Added
 
+- `TlsPolicy` and `ConnectionSecurity` in `flashdk-core`, a `Device::security()` method, and `flashdk_adapters::scheme` with the HTTPS-or-HTTP decision logic. PiKVM and GL.iNet report their pinned certificate. See docs/decisions.md #11.
+
 - The core/adapter workspace split (`flashdk-core`, `flashdk-adapters`), with the
   capability model, transport-kind distinction, and the vendor-neutral `Hid`,
   `Power`, `VirtualMedia`, and `Device` traits.

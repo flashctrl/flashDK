@@ -225,3 +225,34 @@ charter forbids); dropping NanoKVM entirely (the HID protocol is wire-derived an
 
 **What would justify revisiting:** Sipeed documenting the login, or granting permission
 in writing. Either restores password login, from that document.
+
+## 11. A TLS policy on connect, defaulting to HTTPS-only
+
+**Chosen:** `TlsPolicy` (`RequireTls` by default, `PreferTls`, `CleartextOnly`) decides
+which schemes an adapter may use, and every device reports `ConnectionSecurity`
+(`Tls { pinned }` or `Cleartext`) so apps can warn. `PreferTls` falls back to cleartext
+only when nothing listens for TLS (refused, timed out, unreachable), never after a
+certificate or handshake error, and never for a host with a stored pin.
+
+**Why:** most KVMs ship with HTTPS off, yet credentials and input are the most
+sensitive traffic a user has. The library must handle both, but must not let an app
+send passwords in cleartext by accident. A stored pin proves the device has spoken TLS,
+so stepping down for it would hand an attacker a downgrade: block port 443 and the
+client quietly falls back.
+
+**What it cost:** a cleartext-only device needs an explicit `CleartextOnly`, which is
+more friction than before. `PreferTls` still downgrades a device never seen over TLS
+if an attacker blocks 443 on first contact, so apps should treat it as a convenience
+and record the outcome rather than rely on it. The first-seen device has no pin to
+protect it.
+
+**Rejected:** silent fallback to cleartext (a downgrade the user never sees); a
+permissive default that keeps today's behaviour (leaves every new app unprotected);
+disabling certificate checks for self-signed devices (we pin instead, decision 2).
+
+**Status:** the policy types, the decision logic and `Device::security()` are in; PiKVM
+and GL.iNet report their pins. NanoKVM and JetKVM still connect over cleartext only and
+report it. Wiring the policy into their `connect` calls, including WebSocket over TLS,
+is the next step.
+
+**What would justify revisiting:** vendors enabling TLS by default.

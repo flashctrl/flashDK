@@ -35,6 +35,9 @@ struct ApiResponse {
 /// A connected GL.iNet Comet.
 pub struct GlInetKvm {
     base_url: String,
+    /// Kept to report the pinned certificate through [`Device::security`].
+    host: String,
+    pins: Arc<dyn PinStore>,
     http: reqwest::Client,
     /// Session token from `/api/auth/login`, sent back as a bare `Token` header.
     /// `None` before login or after `logout()`.
@@ -59,9 +62,11 @@ impl GlInetKvm {
         store: Arc<dyn PinStore>,
     ) -> Result<Self> {
         let host_owned = host.to_string();
-        let http = tls_pin::tofu_client(&host_owned, store).map_err(Error::Transport)?;
+        let http = tls_pin::tofu_client(&host_owned, store.clone()).map_err(Error::Transport)?;
         let mut kvm = Self {
             base_url: format!("https://{host_owned}"),
+            host: host_owned,
+            pins: store,
             http,
             token: Mutex::new(None),
             identity: Mutex::new(None),
@@ -245,6 +250,12 @@ impl Device for GlInetKvm {
             virtual_media: true,
             wake_on_lan: false,
             tls_pinnable: true,
+        }
+    }
+
+    fn security(&self) -> flashdk_core::ConnectionSecurity {
+        flashdk_core::ConnectionSecurity::Tls {
+            pinned: self.pins.get(&self.host),
         }
     }
 

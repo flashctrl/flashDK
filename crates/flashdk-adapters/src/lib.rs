@@ -17,6 +17,7 @@ pub mod nanokvm;
 pub mod nut;
 pub mod pikvm;
 pub mod redfish;
+pub mod scheme;
 pub mod tls_pin;
 
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
