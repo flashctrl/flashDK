@@ -55,7 +55,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let images = kvm.list().await?;
     println!("virtual media images: {images:?}");
     if std::env::var("JETKVM_MOUNT_TEST").is_ok() {
-        if let Some(img) = images.first() {
+        if images.iter().any(|m| m.mounted) {
+            return Err("an image is already mounted; not touching it".into());
+        }
+        // JETKVM_MOUNT_NAME picks the image (default: the first listed).
+        let want = std::env::var("JETKVM_MOUNT_NAME").ok();
+        let pick = images
+            .iter()
+            .find(|m| want.as_deref().is_none_or(|w| m.name == w));
+        if let Some(img) = pick {
             kvm.mount(&img.name).await?;
             println!("mounted {} -> {:?}", img.name, kvm.list().await?);
             kvm.unmount().await?;
