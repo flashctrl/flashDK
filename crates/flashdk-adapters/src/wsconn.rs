@@ -310,7 +310,7 @@ mod tls_tests {
         let ck = rcgen::generate_simple_self_signed(vec!["127.0.0.1".into()]).unwrap();
         let der = ck.cert.der().clone();
         let fp: [u8; 32] = Sha256::digest(der.as_ref()).into();
-        let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(ck.key_pair.serialize_der()));
+        let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(ck.signing_key.serialize_der()));
         let cfg = rustls::ServerConfig::builder_with_provider(Arc::new(
             rustls::crypto::aws_lc_rs::default_provider(),
         ))
