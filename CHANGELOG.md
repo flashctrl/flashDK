@@ -17,6 +17,7 @@ bumps and dated entries begin at the first real release.
 ### Added
 
 - `TlsPolicy` and `ConnectionSecurity` in `flashdk-core`, a `Device::security()` method, and `flashdk_adapters::scheme` with the HTTPS-or-HTTP decision logic. PiKVM and GL.iNet report their pinned certificate. See docs/decisions.md #11.
+- FFI: `connect` and `connect_nanokvm_with_token` now give up after 30 s with a `Transport` error ("connect timed out"), so an unresponsive device can no longer hang the caller.
 - FFI: `connect` takes a `TlsPolicy` before the pin store; new `connect_nanokvm_with_token`, `Kvm::security()` returning `ConnectionSecurity`, and a `TlsRequired` error. PiKVM and GL.iNet reject `CleartextOnly` with `NotSupported`. **Breaking** for the FFI consumer (one new `connect` parameter).
 - `Error::TlsRequired` (core, and `FlashError.TlsRequired` over FFI): the device redirected plain HTTP to HTTPS. `Error` is now `#[non_exhaustive]`. Cleartext REST clients no longer follow redirects.
 - `tls_pinnable` is now true for NanoKVM and JetKVM (they pin when HTTPS is enabled on the device).

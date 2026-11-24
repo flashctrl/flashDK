@@ -291,8 +291,40 @@ fn core_store(pin_store: Option<Arc<dyn PinStore>>) -> Arc<dyn CorePinStore> {
 ///
 /// NanoKVM password login is unavailable and returns `NotSupported`: use
 /// [`connect_nanokvm_with_token`].
+/// Upper bound for a whole connect (login, TLS, WebRTC handshake). Without it an
+/// unresponsive device could leave the app waiting forever.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Run `fut`, failing with a transport error if it takes longer than `limit`.
+async fn within<T>(
+    limit: std::time::Duration,
+    fut: impl std::future::Future<Output = Result<T>>,
+) -> Result<T> {
+    match tokio::time::timeout(limit, fut).await {
+        Ok(r) => r,
+        Err(_) => Err(FlashError::Transport {
+            detail: format!("connect timed out after {}s", limit.as_secs()),
+        }),
+    }
+}
+
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn connect(
+    vendor: Vendor,
+    host: String,
+    username: String,
+    password: String,
+    tls_policy: TlsPolicy,
+    pin_store: Option<Arc<dyn PinStore>>,
+) -> Result<Arc<Kvm>> {
+    within(
+        CONNECT_TIMEOUT,
+        connect_inner(vendor, host, username, password, tls_policy, pin_store),
+    )
+    .await
+}
+
+async fn connect_inner(
     vendor: Vendor,
     host: String,
     username: String,
@@ -467,6 +499,19 @@ mod tests {
             ConnectionSecurity::from(flashdk_core::ConnectionSecurity::Cleartext),
             ConnectionSecurity::Cleartext
         );
+    }
+
+    #[test]
+    fn a_stalled_connect_times_out_with_a_transport_error() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let r: Result<()> = rt.block_on(within(
+            std::time::Duration::from_millis(20),
+            std::future::pending(),
+        ));
+        assert!(matches!(r, Err(FlashError::Transport { .. })));
     }
 
     #[test]

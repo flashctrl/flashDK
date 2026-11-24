@@ -24,4 +24,4 @@ bindgen = ["uniffi/cli"]
 flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 flashdk-adapters = { path = "../flashdk-adapters", version = "0.0.1" }
 uniffi = { version = "0.32.2", features = ["tokio"] }
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
