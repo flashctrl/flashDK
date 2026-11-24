@@ -11,7 +11,7 @@ settled adapters, and the open questions, once they're answered.
 | Vendor | HID | Power | Virtual media | Notes |
 |---|---|---|---|---|
 | PiKVM | Live, verified | Live, verified reads; actions implemented but never exercised (this unit has no ATX controller attached) | Live, verified | TLS with trust-on-first-use pinning; see [security.md](security.md) |
-| NanoKVM | Live, verified | Live, verified | Live, verified | Cleartext HTTP; see [security.md](security.md) for what that means in practice |
+| NanoKVM | Live, verified (via session token; password login quarantined, see [nanokvm/PROVENANCE.md](../crates/flashdk-adapters/src/nanokvm/PROVENANCE.md)) | Live, verified | Live, verified | Cleartext HTTP; see [security.md](security.md) for what that means in practice |
 | JetKVM | Live, verified over WebRTC (signaling now over a WebSocket on firmware 0.5.9; re-verified live) | Not implemented (ATX/DC extension methods uncaptured) | Live, verified (list/mount CD-ROM/unmount via `rpc`; Disk mode and upload captured but not yet in the adapter; URL mount, delete not captured) | The `rpc` JSON-RPC channel works (verified with `getLocalVersion`), but the method names and payload shapes for power and virtual media haven't been captured off the wire yet |
 | GL.iNet | Live, verified (key/mouse/wheel/paste all confirmed against the real API). Absolute mouse move and left click have an **observed effect on a real target** (2026-10-07, Proxmox installer); keyboard effect observed too (Ctrl+Alt+F3 and typed commands in the installer shell) | Live API accepted (`power`/`power_long`/`reset` all return `ok:true`); a host is now attached, but there is no ATX board, so power effect and power-state reads are unverified (state reads `false` even while the host runs) | Live, verified: list, upload, mount, unmount, remove (host-confirmed: swapping the mounted image with the host running changed `sr0`'s size and label, no reboot needed) | Turns out to run the `kvmd` daemon stack itself, confirmed via its own `/api/info`; its own login-and-token auth, not PiKVM's static headers. See [captures/glinet-comet-kvmd-api.md](captures/glinet-comet-kvmd-api.md) |
 
@@ -99,7 +99,7 @@ specific work needs an AMT 3.0+ unit to verify against; see
   Rust-only consumers today (see the example binaries under
   `crates/flashdk-adapters/examples/`).
 - **TOFU pinning beyond PiKVM and Redfish.** The mechanism in `tls_pin.rs` is
-  reused as-is by `redfish::RedfishBmc`; NanoKVM has no TLS to pin, and JetKVM's
+  reused as-is by `redfish::RedfishBmc`, and now by NanoKVM and JetKVM when the policy selects HTTPS (their HTTPS is off by default; untested on a device). JetKVM's
   HTTP signaling is unauthenticated by transport (its media is secured by
   WebRTC's own DTLS instead).
 

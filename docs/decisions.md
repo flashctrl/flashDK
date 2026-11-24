@@ -199,3 +199,65 @@ functional benefit); leaving commit format entirely unstandardized going forward
 
 **What would justify revisiting:** nothing. This is the intended permanent state,
 not a placeholder.
+
+## 10. Quarantine NanoKVM password login, supply a session token instead
+
+**Chosen:** the NanoKVM adapter no longer logs in with a password. `NanoKvm::connect`
+returns `NotSupported`, and `NanoKvm::connect_with_token` accepts a session token the
+user obtained by signing in through the device's own web interface.
+
+**Why:** the device requires a client-side encryption of the password, using a
+passphrase that exists only in the vendor's web client. It is not on the wire and not in
+the vendor's documentation. The code we had used it, which means we could not show it was
+written from permitted sources (CLEANROOM.md). We tested plain-password login (rejected),
+HTTP Basic (rejected), and TLS (no listener on the tested unit), and found no permitted
+route to the secret. A secret cannot be recovered from ciphertext by black-box testing.
+
+**What it cost:** NanoKVM users cannot sign in with a password in any app built on this
+SDK. An app must obtain a token another way, for example by showing the vendor's own web
+login in a WebView and reading its cookie, which is clumsy and is the vendor's interface
+rather than ours. Tokens expire, so users re-authenticate. The removed code remains in
+git history, whose rewrite is a separate, unmade decision.
+
+**Rejected:** keeping the code with a disclaimer (a disclaimer does not make a copied
+constant clean); reading the web client "just to confirm" the constant (the exact act the
+charter forbids); dropping NanoKVM entirely (the HID protocol is wire-derived and fine).
+
+**What would justify revisiting:** Sipeed documenting the login, or granting permission
+in writing. Either restores password login, from that document.
+
+## 11. A TLS policy on connect, defaulting to HTTPS-only
+
+**Chosen:** `TlsPolicy` (`RequireTls` by default, `PreferTls`, `CleartextOnly`) decides
+which schemes an adapter may use, and every device reports `ConnectionSecurity`
+(`Tls { pinned }` or `Cleartext`) so apps can warn. `PreferTls` falls back to cleartext
+only when nothing listens for TLS (refused, timed out, unreachable), never after a
+certificate or handshake error, and never for a host with a stored pin.
+
+**Why:** most KVMs ship with HTTPS off, yet credentials and input are the most
+sensitive traffic a user has. The library must handle both, but must not let an app
+send passwords in cleartext by accident. A stored pin proves the device has spoken TLS,
+so stepping down for it would hand an attacker a downgrade: block port 443 and the
+client quietly falls back.
+
+**What it cost:** a cleartext-only device needs an explicit `CleartextOnly`, which is
+more friction than before. `PreferTls` still downgrades a device never seen over TLS
+if an attacker blocks 443 on first contact, so apps should treat it as a convenience
+and record the outcome rather than rely on it. The first-seen device has no pin to
+protect it.
+
+**Rejected:** silent fallback to cleartext (a downgrade the user never sees); a
+permissive default that keeps today's behaviour (leaves every new app unprotected);
+disabling certificate checks for self-signed devices (we pin instead, decision 2).
+
+**Status:** done for the adapters that can use both schemes. NanoKVM and JetKVM take the
+policy and a pin store in `connect`, open WebSockets over TLS with the same trust-on-first-use
+pinning as the REST clients (`wsconn.rs`), and report what they actually used through
+`Device::security()`. PiKVM and GL.iNet remain HTTPS-only: `CleartextOnly` is not
+offered for them, since both redirect or refuse plain HTTP by default and that is
+unverified here. Tested against loopback TLS servers (pin on first contact, same cert
+accepted, changed cert refused with no downgrade); **not yet run against a device**,
+and our NanoKVM has HTTPS off, so its TLS path cannot be checked on it. The FFI has not
+been updated; it lives on `feat/uniffi-android`.
+
+**What would justify revisiting:** vendors enabling TLS by default.

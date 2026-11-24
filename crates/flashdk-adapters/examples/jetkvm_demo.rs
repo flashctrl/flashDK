@@ -12,9 +12,20 @@
 use std::time::Duration;
 
 use flashdk_adapters::jetkvm::JetKvm;
+use flashdk_adapters::tls_pin::MemoryPinStore;
 use flashdk_core::hid::{AbsMouse, Hid};
 use flashdk_core::media::VirtualMedia;
-use flashdk_core::Device;
+use flashdk_core::{Device, TlsPolicy};
+use std::sync::Arc;
+
+/// FLASHDK_TLS=require|prefer|cleartext (default prefer).
+fn policy() -> TlsPolicy {
+    match std::env::var("FLASHDK_TLS").as_deref() {
+        Ok("require") => TlsPolicy::RequireTls,
+        Ok("cleartext") => TlsPolicy::CleartextOnly,
+        _ => TlsPolicy::PreferTls,
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,9 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pass = std::env::var("JETKVM_PASS").expect("set JETKVM_PASS");
 
     println!("Connecting to JetKVM (login + WebRTC handshake)…");
-    let kvm = tokio::time::timeout(Duration::from_secs(25), JetKvm::connect(host, &pass))
-        .await
-        .map_err(|_| "connect timed out: WebRTC/hidrpc channel never opened")??;
+    let kvm = tokio::time::timeout(
+        Duration::from_secs(25),
+        JetKvm::connect(host, &pass, policy(), Arc::new(MemoryPinStore::default())),
+    )
+    .await
+    .map_err(|_| "connect timed out: WebRTC/hidrpc channel never opened")??;
 
     println!(
         "Connected: {} ({:?}), transport {:?}",

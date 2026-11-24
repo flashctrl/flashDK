@@ -1,27 +1,41 @@
 //! NanoKVM PCIe adapter: REST for auth/aux, and a binary WebSocket (`/api/ws`) for
-//! live keyboard and mouse. Everything here is derived from wire observation
-//! (docs/captures/nanokvm-ws-hid.md, and the publicly-documented AES login).
+//! live keyboard and mouse, derived from wire observation
+//! (docs/captures/nanokvm-ws-hid.md).
+//!
+//! Password login is quarantined: it needed a secret that exists only in the vendor's
+//! web client, which CLEANROOM.md forbids reading. See PROVENANCE.md in this directory.
+//! A session token the user already holds can be supplied with
+//! [`NanoKvm::connect_with_token`].
 
-mod auth;
 mod wire;
 
 use flashdk_core::capability::Vendor;
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};
 use flashdk_core::power::{Power, PowerAction, PowerState};
-use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::{
+    Capabilities, ConnectionSecurity, Device, DeviceInfo, Error, Result, TlsPolicy, TransportKind,
+};
 
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
-use std::sync::Mutex;
-use tokio::net::TcpStream;
+use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
+use crate::scheme::Scheme;
+use crate::tls_pin::{self, PinStore};
+use crate::wsconn::{connect_with_policy, open_ws, Attempt, WsStream};
 use wire::{mouse_frame, KeyboardState};
 
-type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+type WsSink = SplitSink<WsStream, Message>;
+
+fn base_url(scheme: Scheme, host: &str) -> String {
+    match scheme {
+        Scheme::Https => format!("https://{host}"),
+        Scheme::Http => format!("http://{host}"),
+    }
+}
 
 /// Last-known absolute cursor position, so wheel/button-only events can re-send it.
 #[derive(Default, Clone, Copy)]
@@ -34,6 +48,8 @@ struct MousePos {
 pub struct NanoKvm {
     host: String,
     base_url: String,
+    scheme: Scheme,
+    pins: Arc<dyn PinStore>,
     http: reqwest::Client,
     token: String,
     /// Firmware ("image") version read from /api/vm/info at connect, e.g. "v1.4.0".
@@ -59,52 +75,89 @@ fn extract_image_version(data: &serde_json::Value) -> Option<String> {
 }
 
 impl NanoKvm {
-    /// Log in and open the HID WebSocket. `host` is e.g. "10.0.10.10".
+    /// Password login is **not available** and always returns `NotSupported`, before
+    /// any network traffic.
     ///
-    /// Uses plaintext `http`/`ws` today; the device also offers TLS on 443, and a
-    /// later pass will prefer `wss` with certificate handling.
-    pub async fn connect(host: impl Into<String>, username: &str, password: &str) -> Result<Self> {
+    /// The device rejects a plain password, and the scheme it expects depends on a
+    /// secret that appears only in the vendor's web client, never on the wire or in
+    /// the vendor's documentation. We will not read that client, so we cannot
+    /// implement it. This returns when Sipeed documents the login or permits it in
+    /// writing. Until then, use [`Self::connect_with_token`].
+    pub async fn connect(
+        _host: impl Into<String>,
+        _username: &str,
+        _password: &str,
+    ) -> Result<Self> {
+        Err(Error::NotSupported(
+            "NanoKVM password login (no clean-room source; use connect_with_token)",
+        ))
+    }
+
+    /// Open the HID WebSocket with a session `token` the user already obtained by
+    /// signing in through the device's own web interface (the `nano-kvm-token`
+    /// cookie value). `host` is e.g. "10.0.10.10". Tokens expire, so callers must
+    /// handle `Auth` errors by asking the user to sign in again.
+    ///
+    /// `policy` picks HTTPS or cleartext (see [`TlsPolicy`]). NanoKVM ships with HTTPS
+    /// off, so a stock unit needs `PreferTls` or `CleartextOnly`; once HTTPS is
+    /// enabled on the device, certificates are pinned in `store` on first contact.
+    /// [`Device::security`] reports which one was actually used.
+    pub async fn connect_with_token(
+        host: impl Into<String>,
+        token: &str,
+        policy: TlsPolicy,
+        store: Arc<dyn PinStore>,
+    ) -> Result<Self> {
         let host = host.into();
-        let base_url = format!("http://{host}");
+        let token = token.to_string();
 
-        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
-        let token = auth::login(&http, &base_url, username, password).await?;
+        let ((http, sink, firmware, scheme), _scheme) =
+            connect_with_policy(policy, &host, &store, |scheme| {
+                let host = host.clone();
+                let token = token.clone();
+                let store = store.clone();
+                async move {
+                    let cookie = format!("nano-kvm-token={token}");
+                    let http = match scheme {
+                        Scheme::Https => tls_pin::tofu_client(&host, store.clone()),
+                        Scheme::Http => tls_pin::plain_client(),
+                    }
+                    .map_err(|e| Attempt::fatal(Error::Transport(e)))?;
 
-        // Open the HID WebSocket, authenticating with the token cookie.
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        use tokio_tungstenite::tungstenite::http::header::COOKIE;
-        let mut req = format!("ws://{host}/api/ws")
-            .into_client_request()
-            .map_err(|e| Error::Transport(e.to_string()))?;
-        req.headers_mut().insert(
-            COOKIE,
-            format!("nano-kvm-token={token}")
-                .parse()
-                .map_err(|_| Error::Protocol("bad cookie header".into()))?,
-        );
-        let (stream, _resp) = tokio_tungstenite::connect_async(req)
-            .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
-        let (sink, _read) = stream.split();
+                    let stream = open_ws(
+                        scheme,
+                        &host,
+                        "/api/ws",
+                        &[("Cookie", cookie.clone())],
+                        &store,
+                    )
+                    .await?;
+                    let (sink, _read) = stream.split();
 
-        // Best-effort: read the firmware/image version for DeviceInfo.
-        let vm_info = http
-            .get(format!("{base_url}/api/vm/info"))
-            .header("Cookie", format!("nano-kvm-token={token}"))
-            .send()
-            .await
-            .ok();
-        let mut parsed: Option<NkResponse> = None;
-        if let Some(r) = vm_info {
-            parsed = r.json::<NkResponse>().await.ok();
-        }
-        let firmware = parsed
-            .and_then(|r| extract_image_version(&r.data))
-            .unwrap_or_else(|| "unknown".to_string());
+                    // Best-effort: read the firmware/image version for DeviceInfo.
+                    let base = base_url(scheme, &host);
+                    let parsed = match http
+                        .get(format!("{base}/api/vm/info"))
+                        .header("Cookie", cookie)
+                        .send()
+                        .await
+                    {
+                        Ok(r) => r.json::<NkResponse>().await.ok(),
+                        Err(_) => None,
+                    };
+                    let firmware = parsed
+                        .and_then(|r| extract_image_version(&r.data))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    Ok((http, sink, firmware, scheme))
+                }
+            })
+            .await?;
 
         Ok(Self {
+            base_url: base_url(scheme, &host),
+            scheme,
+            pins: store,
             host,
-            base_url,
             http,
             token,
             firmware,
@@ -191,6 +244,15 @@ impl Device for NanoKvm {
             virtual_media: true,
             wake_on_lan: false,
             tls_pinnable: false,
+        }
+    }
+
+    fn security(&self) -> ConnectionSecurity {
+        match self.scheme {
+            Scheme::Https => ConnectionSecurity::Tls {
+                pinned: self.pins.get(&self.host),
+            },
+            Scheme::Http => ConnectionSecurity::Cleartext,
         }
     }
 
@@ -343,5 +405,21 @@ mod tests {
     #[test]
     fn missing_image_field_is_none() {
         assert_eq!(extract_image_version(&serde_json::json!({})), None);
+    }
+}
+
+#[cfg(test)]
+mod quarantine_tests {
+    use super::*;
+
+    /// Password login must refuse before touching the network. `.invalid` can never
+    /// resolve, so any attempt to connect would surface as a Transport error instead.
+    #[tokio::test]
+    async fn password_login_is_not_supported() {
+        let err = NanoKvm::connect("nanokvm.invalid", "user", "pass")
+            .await
+            .err()
+            .expect("password login must not succeed");
+        assert!(matches!(err, Error::NotSupported(_)), "got {err:?}");
     }
 }

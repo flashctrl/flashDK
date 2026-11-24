@@ -10,15 +10,22 @@ batched at release time.
 Nothing has been tagged or published yet; the workspace stays at `0.0.1`. Version
 bumps and dated entries begin at the first real release.
 
+### Security
+
+- NanoKVM password login removed (quarantined): it relied on a secret taken from the vendor's web client, which CLEANROOM.md forbids. `NanoKvm::connect` now returns `NotSupported`; use `NanoKvm::connect_with_token`. See docs/decisions.md #10.
+
 ### Added
+
+- `TlsPolicy` and `ConnectionSecurity` in `flashdk-core`, a `Device::security()` method, and `flashdk_adapters::scheme` with the HTTPS-or-HTTP decision logic. PiKVM and GL.iNet report their pinned certificate. See docs/decisions.md #11.
+- Stage 2 of the TLS policy: `NanoKvm::connect_with_token` and `JetKvm::connect` now take a `TlsPolicy` and a `PinStore`, and speak HTTPS plus WebSocket-over-TLS (`wsconn.rs`, certificate pinned on first use) or cleartext as the policy allows. **Breaking:** both signatures gained two parameters. Connect and handshake timeouts (10 s) now apply to the WebSocket upgrades. Verified by loopback TLS tests only, not yet against a device.
 
 - The core/adapter workspace split (`flashdk-core`, `flashdk-adapters`), with the
   capability model, transport-kind distinction, and the vendor-neutral `Hid`,
   `Power`, `VirtualMedia`, and `Device` traits.
 - A live, verified PiKVM adapter: keyboard and mouse over its REST HID API, power
   actions and state over `/api/atx`, virtual media over `/api/msd`.
-- A live, verified NanoKVM adapter: a Rust reimplementation of its AES-based login
-  scheme, keyboard and mouse over its binary WebSocket protocol, power actions and
+- A live, verified NanoKVM adapter: session-token connection (password login was
+  later removed, see Security), keyboard and mouse over its binary WebSocket protocol, power actions and
   state, and virtual media.
 - A live, verified JetKVM adapter for keyboard and mouse, built on a sans-IO
   WebRTC transport (`str0m`) that this project wrote from scratch after

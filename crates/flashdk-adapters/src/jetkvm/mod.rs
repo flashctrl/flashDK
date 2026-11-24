@@ -15,18 +15,25 @@
 mod transport;
 mod wire;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use flashdk_core::capability::Vendor;
 use flashdk_core::hid::{AbsMouse, Hid, KeyEvent, RelMouse, Wheel};
 use flashdk_core::media::{MediaImage, VirtualMedia};
 use flashdk_core::power::{Power, PowerAction, PowerState};
-use flashdk_core::{Capabilities, Device, DeviceInfo, Error, Result, TransportKind};
+use flashdk_core::{
+    Capabilities, ConnectionSecurity, Device, DeviceInfo, Error, Result, TlsPolicy, TransportKind,
+};
 
+use crate::scheme::Scheme;
+use crate::tls_pin::{self, PinStore};
+use crate::wsconn::{connect_with_policy, Attempt};
 use transport::JetTransport;
 
 /// A connected JetKVM.
 pub struct JetKvm {
+    scheme: Scheme,
+    pins: Arc<dyn PinStore>,
     host: String,
     /// App version reported by the device at connect (via getLocalVersion).
     firmware: String,
@@ -38,32 +45,62 @@ pub struct JetKvm {
 
 impl JetKvm {
     /// Log in and establish the WebRTC connection to `host` (e.g. "10.0.10.21").
-    pub async fn connect(host: impl Into<String>, password: &str) -> Result<Self> {
+    ///
+    /// `policy` picks HTTPS or cleartext (see [`TlsPolicy`]); the login and the
+    /// signaling WebSocket use the same scheme. WebRTC media is end-to-end DTLS either
+    /// way, but its fingerprint travels in the signaling, so cleartext signaling
+    /// leaves the session open to interception on the local network.
+    pub async fn connect(
+        host: impl Into<String>,
+        password: &str,
+        policy: TlsPolicy,
+        store: Arc<dyn PinStore>,
+    ) -> Result<Self> {
         let host = host.into();
-        // cookie store carries the authToken cookie into signaling
-        let http = crate::tls_pin::plain_client().map_err(Error::Transport)?;
 
-        let body = serde_json::json!({ "password": password }).to_string();
-        let resp = http
-            .post(format!("http://{host}/auth/login-local"))
-            .header("Content-Type", "application/json")
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
-        if !resp.status().is_success() {
-            return Err(Error::Auth(format!("login failed: HTTP {}", resp.status())));
-        }
-        let cookie = resp
-            .headers()
-            .get_all(reqwest::header::SET_COOKIE)
-            .iter()
-            .filter_map(|v| v.to_str().ok())
-            .filter_map(|v| v.split(';').next())
-            .collect::<Vec<_>>()
-            .join("; ");
+        let ((cookie, scheme), _) = connect_with_policy(policy, &host, &store, |scheme| {
+            let host = host.clone();
+            let store = store.clone();
+            let body = serde_json::json!({ "password": password }).to_string();
+            async move {
+                let (http, url) = match scheme {
+                    Scheme::Https => (
+                        tls_pin::tofu_client(&host, store),
+                        format!("https://{host}/auth/login-local"),
+                    ),
+                    Scheme::Http => (
+                        tls_pin::plain_client(),
+                        format!("http://{host}/auth/login-local"),
+                    ),
+                };
+                let http = http.map_err(|e| Attempt::fatal(Error::Transport(e)))?;
+                let resp = http
+                    .post(url)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .send()
+                    .await
+                    .map_err(|e| Attempt::from_source(Error::Transport(e.to_string()), &e))?;
+                if !resp.status().is_success() {
+                    return Err(Attempt::fatal(Error::Auth(format!(
+                        "login failed: HTTP {}",
+                        resp.status()
+                    ))));
+                }
+                let cookie = resp
+                    .headers()
+                    .get_all(reqwest::header::SET_COOKIE)
+                    .iter()
+                    .filter_map(|v| v.to_str().ok())
+                    .filter_map(|v| v.split(';').next())
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                Ok((cookie, scheme))
+            }
+        })
+        .await?;
 
-        let transport = transport::connect(&cookie, &host).await?;
+        let transport = transport::connect(&cookie, &host, scheme, &store).await?;
 
         // Best-effort: read the app version over the rpc channel for DeviceInfo.
         let firmware = transport
@@ -74,6 +111,8 @@ impl JetKvm {
             .unwrap_or_else(|| "unknown".to_string());
 
         Ok(Self {
+            scheme,
+            pins: store,
             host,
             firmware,
             transport,
@@ -119,6 +158,15 @@ impl Device for JetKvm {
             virtual_media: true,
             wake_on_lan: true,   // getWakeOnLanDevices (rpc channel)
             tls_pinnable: false, // HTTP signaling; media secured by WebRTC's own DTLS
+        }
+    }
+
+    fn security(&self) -> ConnectionSecurity {
+        match self.scheme {
+            Scheme::Https => ConnectionSecurity::Tls {
+                pinned: self.pins.get(&self.host),
+            },
+            Scheme::Http => ConnectionSecurity::Cleartext,
         }
     }
 
