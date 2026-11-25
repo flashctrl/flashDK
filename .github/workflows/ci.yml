@@ -47,11 +47,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --version 4.1.2 --locked
-      # The runner image ships the NDK; this is the same API level the app targets.
+      # The runner image ships an NDK and points ANDROID_NDK_ROOT at it, which cargo-ndk
+      # reads. Do not override it through the `env` context: runner variables are not in
+      # it, so the value would be empty. API 26 is the level the app targets.
       - name: Cross-compile for arm64-v8a and x86_64
         run: cargo ndk --platform 26 -t arm64-v8a -t x86_64 build --release -p flashdk-ffi
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
 
   compliance:
     name: license, supply-chain & clean-room
