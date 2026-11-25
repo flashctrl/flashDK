@@ -63,6 +63,8 @@ impl PinStore for MemoryPinStore {
 #[derive(Debug)]
 pub struct CertificateMismatch {
     pub host: String,
+    /// The fingerprint of the certificate that was refused.
+    pub presented: Fingerprint,
 }
 
 impl std::fmt::Display for CertificateMismatch {
@@ -85,8 +87,11 @@ impl std::error::Error for CertificateMismatch {}
 pub fn transport_error(err: &(dyn std::error::Error + 'static)) -> Error {
     let mut cur = Some(err);
     while let Some(e) = cur {
-        if let Some(host) = mismatched_host(e) {
-            return Error::CertificateChanged { host };
+        if let Some(m) = mismatch_in(e) {
+            return Error::CertificateChanged {
+                host: m.host.clone(),
+                presented: m.presented,
+            };
         }
         // `io::Error::source` skips the error it wraps, so look inside it directly.
         if let Some(io) = e.downcast_ref::<std::io::Error>() {
@@ -100,12 +105,11 @@ pub fn transport_error(err: &(dyn std::error::Error + 'static)) -> Error {
     Error::Transport(err.to_string())
 }
 
-fn mismatched_host(e: &(dyn std::error::Error + 'static)) -> Option<String> {
+fn mismatch_in<'a>(e: &'a (dyn std::error::Error + 'static)) -> Option<&'a CertificateMismatch> {
     match e.downcast_ref::<rustls::Error>()? {
-        rustls::Error::InvalidCertificate(rustls::CertificateError::Other(other)) => other
-            .0
-            .downcast_ref::<CertificateMismatch>()
-            .map(|m| m.host.clone()),
+        rustls::Error::InvalidCertificate(rustls::CertificateError::Other(other)) => {
+            other.0.downcast_ref::<CertificateMismatch>()
+        }
         _ => None,
     }
 }
@@ -165,6 +169,7 @@ impl ServerCertVerifier for TofuVerifier {
                 rustls::CertificateError::Other(rustls::OtherError(Arc::new(
                     CertificateMismatch {
                         host: self.host.clone(),
+                        presented: fingerprint,
                     },
                 ))),
             )),
