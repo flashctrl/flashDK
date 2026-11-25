@@ -80,7 +80,7 @@ impl JetKvm {
                     .body(body)
                     .send()
                     .await
-                    .map_err(|e| Attempt::from_source(Error::Transport(e.to_string()), &e))?;
+                    .map_err(|e| Attempt::from_source(tls_pin::transport_error(&e), &e))?;
                 if resp.status().is_redirection() {
                     return Err(crate::wsconn::redirect_error(resp.headers()));
                 }

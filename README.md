@@ -57,7 +57,9 @@ on the HTTPS port, and never after a certificate failure or for a device whose
 certificate is already pinned. `CleartextOnly` skips TLS. NanoKVM and JetKVM ship with
 HTTPS off, so a stock unit needs one of the last two. PiKVM and GL.iNet are HTTPS only.
 
-Certificates are pinned on first use. Give the SDK a persistent pin store, or every
+Certificates are pinned on first use. If a device later shows a different certificate,
+the connect fails with `CertificateChanged`. Tell the user, and replace the pin only if
+they accept, because it can mean an interception. Give the SDK a persistent pin store, or every
 launch trusts whatever certificate it sees first.
 
 NanoKVM password login is not available. It depended on a secret that only exists in

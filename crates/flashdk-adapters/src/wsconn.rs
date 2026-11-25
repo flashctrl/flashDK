@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::WebSocketStream;
 
 use crate::scheme::{fallback_allowed, schemes_to_try, Scheme};
-use crate::tls_pin::{tofu_config, PinStore};
+use crate::tls_pin::{self, tofu_config, PinStore};
 
 const TCP_TIMEOUT: Duration = Duration::from_secs(10);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -159,7 +159,12 @@ pub async fn open_ws(
             let tls = tokio::time::timeout(HANDSHAKE_TIMEOUT, connector.connect(name, tcp))
                 .await
                 .map_err(|_| Attempt::fatal(Error::Transport("TLS handshake timed out".into())))?
-                .map_err(|e| Attempt::fatal(Error::Transport(format!("TLS: {e}"))))?;
+                .map_err(|e| {
+                    Attempt::fatal(match tls_pin::transport_error(&e) {
+                        Error::Transport(m) => Error::Transport(format!("TLS: {m}")),
+                        other => other,
+                    })
+                })?;
             Box::new(tls)
         }
     };
@@ -279,6 +284,15 @@ mod tests {
         assert!(!redirect_error(&h).downgrade_ok);
         assert!(matches!(
             redirect_error(&HeaderMap::new()).error,
+            Error::Transport(_)
+        ));
+    }
+
+    #[test]
+    fn other_failures_stay_transport_errors() {
+        let e = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        assert!(matches!(
+            crate::tls_pin::transport_error(&e),
             Error::Transport(_)
         ));
     }

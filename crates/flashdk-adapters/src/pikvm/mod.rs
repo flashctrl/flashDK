@@ -126,7 +126,7 @@ impl PiKvm {
             .auth(self.http.get(format!("{}{}", self.base_url, path)))
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await
@@ -144,7 +144,7 @@ impl PiKvm {
             )
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await

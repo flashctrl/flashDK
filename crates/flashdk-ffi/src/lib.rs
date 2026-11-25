@@ -48,6 +48,11 @@ pub enum FlashError {
     /// The device only accepts HTTPS but a cleartext policy was requested. Offer the user
     /// `RequireTls` or `PreferTls`.
     TlsRequired,
+    /// The device's certificate differs from the pinned one. Warn the user; only if they
+    /// accept, update the pin in your `PinStore` and connect again.
+    CertificateChanged {
+        host: String,
+    },
 }
 
 impl fmt::Display for FlashError {
@@ -60,6 +65,12 @@ impl fmt::Display for FlashError {
             Self::Protocol { detail } => write!(f, "protocol error: {detail}"),
             Self::InvalidArgument { detail } => write!(f, "invalid argument: {detail}"),
             Self::TlsRequired => write!(f, "the device requires HTTPS"),
+            Self::CertificateChanged { host } => {
+                write!(
+                    f,
+                    "the TLS certificate for {host} changed since it was pinned"
+                )
+            }
         }
     }
 }
@@ -76,6 +87,7 @@ impl From<flashdk_core::Error> for FlashError {
             E::Transport(detail) => Self::Transport { detail },
             E::Protocol(detail) => Self::Protocol { detail },
             E::TlsRequired => Self::TlsRequired,
+            E::CertificateChanged { host } => Self::CertificateChanged { host },
             // `Error` is non-exhaustive: report variants added later as a protocol error.
             other => Self::Protocol {
                 detail: other.to_string(),

@@ -28,6 +28,11 @@ pub enum Error {
     /// The device only accepts HTTPS (it redirected plain HTTP to it), but the caller
     /// asked for cleartext. Retry with `TlsPolicy::RequireTls` or `PreferTls`.
     TlsRequired,
+    /// The device presented a different TLS certificate from the one pinned for `host`.
+    /// Either it was re-keyed (a reinstall or reset) or someone is intercepting the
+    /// connection. Never retry silently: tell the user, and replace the pin only if
+    /// they accept.
+    CertificateChanged { host: String },
 }
 
 impl fmt::Display for Error {
@@ -39,6 +44,12 @@ impl fmt::Display for Error {
             Error::Transport(msg) => write!(f, "transport error: {msg}"),
             Error::Protocol(msg) => write!(f, "protocol error: {msg}"),
             Error::TlsRequired => write!(f, "the device requires HTTPS"),
+            Error::CertificateChanged { host } => {
+                write!(
+                    f,
+                    "the TLS certificate for {host} changed since it was pinned"
+                )
+            }
         }
     }
 }
