@@ -82,7 +82,7 @@ pub fn power_state_for(action: PowerAction) -> PowerState {
 /// Build the full SOAP envelope for a `RequestPowerStateChange` request.
 ///
 /// `to` is the AMT device's WS-Management endpoint (e.g.
-/// `"http://10.0.1.6:16992/wsman"`), `managed_element_selector` is the
+/// `"http://192.0.2.6:16992/wsman"`), `managed_element_selector` is the
 /// `wsman:Selector` value identifying the target `CIM_ComputerSystem` instance
 /// (device-specific; not sourced yet, see `PROVENANCE.md`), and `message_id` is a
 /// caller-supplied UUID string for `wsa:MessageID` (DSP0226 requires a fresh,
@@ -178,12 +178,12 @@ mod tests {
     #[test]
     fn envelope_contains_required_headers_and_body_shape() {
         let xml = request_power_state_change_envelope(
-            "http://10.0.1.6:16992/wsman",
+            "http://192.0.2.6:16992/wsman",
             "ManagedSystem",
             PowerState::MasterBusReset,
             "uuid:test-message-id",
         );
-        assert!(xml.contains("<wsa:To>http://10.0.1.6:16992/wsman</wsa:To>"));
+        assert!(xml.contains("<wsa:To>http://192.0.2.6:16992/wsman</wsa:To>"));
         assert!(xml.contains(&format!(
             "<wsman:ResourceURI s:mustUnderstand=\"true\">{POWER_MANAGEMENT_SERVICE_NAMESPACE}</wsman:ResourceURI>"
         )));

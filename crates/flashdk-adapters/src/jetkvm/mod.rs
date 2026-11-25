@@ -44,7 +44,7 @@ pub struct JetKvm {
 }
 
 impl JetKvm {
-    /// Log in and establish the WebRTC connection to `host` (e.g. "10.0.10.21").
+    /// Log in and establish the WebRTC connection to `host` (e.g. "192.0.2.21").
     ///
     /// `policy` picks HTTPS or cleartext (see [`TlsPolicy`]); the login and the
     /// signaling WebSocket use the same scheme. WebRTC media is end-to-end DTLS either

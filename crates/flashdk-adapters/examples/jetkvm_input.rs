@@ -6,7 +6,7 @@
 //! and type a short string), `clear` (Ctrl+A, Backspace, Escape), `caps` (tap Caps Lock; run twice to restore).
 //!
 //! ```bash
-//! JETKVM_HOST=10.0.10.21 JETKVM_PASS='...' JETKVM_STEP=point \
+//! JETKVM_HOST=192.0.2.21 JETKVM_PASS='...' JETKVM_STEP=point \
 //!   cargo run -p flashdk-adapters --example jetkvm_input
 //! ```
 

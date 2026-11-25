@@ -14,7 +14,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Actions are not all semver-versioned, so they get the longer wait only where
-    # Dependabot can tell; the default covers the rest.
     cooldown:
       default-days: 7
+      semver-major-days: 14

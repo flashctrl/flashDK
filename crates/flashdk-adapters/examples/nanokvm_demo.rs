@@ -5,7 +5,7 @@
 //! device's own web interface and copy the value of its `nano-kvm-token` cookie.
 //!
 //! ```bash
-//! NANOKVM_HOST=10.0.10.10 NANOKVM_TOKEN='...' \
+//! NANOKVM_HOST=192.0.2.10 NANOKVM_TOKEN='...' \
 //!   cargo run -p flashdk-adapters --example nanokvm_demo
 //! ```
 

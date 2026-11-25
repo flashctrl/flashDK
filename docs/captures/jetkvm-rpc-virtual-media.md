@@ -1,6 +1,6 @@
 # JetKVM `rpc` channel: virtual media, Wake-on-LAN, extensions
 
-**Captured:** 2026-10-07, against an owned JetKVM at 10.0.10.21 (HTTP, logged in),
+**Captured:** 2026-10-07, against an owned JetKVM at 192.0.2.21 (HTTP, logged in),
 attached to a disposable Bazzite target. Method: the official web client was driven
 in a browser while `RTCDataChannel.prototype.send` was wrapped to log every JSON-RPC
 frame sent and received on the `rpc` channel. Only DataChannel message text was

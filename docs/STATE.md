@@ -4,15 +4,15 @@ Working notes for flashDK itself. Delete or rewrite the sections below once they
 longer reflect a moving target: the per-vendor picture, once all four vendors have
 settled adapters, and the open questions, once they're answered.
 
-**Last updated:** 2026-10-07.
+**Last updated:** 2026-11-24. Dated notes in the table say when a claim was last checked.
 
 ## What is true right now, per vendor
 
 | Vendor | HID | Power | Virtual media | Notes |
 |---|---|---|---|---|
 | PiKVM | Live, verified | Live, verified reads; actions implemented but never exercised (this unit has no ATX controller attached) | Live, verified | TLS with trust-on-first-use pinning; see [security.md](security.md) |
-| NanoKVM | Live, verified (via session token; password login quarantined, see [nanokvm/PROVENANCE.md](../crates/flashdk-adapters/src/nanokvm/PROVENANCE.md)) | Live, verified | Live, verified | Cleartext HTTP; see [security.md](security.md) for what that means in practice |
-| JetKVM | Live, verified over WebRTC (signaling now over a WebSocket on firmware 0.5.9; re-verified live) | Not implemented (ATX/DC extension methods uncaptured) | Live, verified (list/mount CD-ROM/unmount via `rpc`; Disk mode and upload captured but not yet in the adapter; URL mount, delete not captured) | The `rpc` JSON-RPC channel works (verified with `getLocalVersion`), but the method names and payload shapes for power and virtual media haven't been captured off the wire yet |
+| NanoKVM | Keyboard verified over TLS (2026-11-17, Caps Lock confirmed by the device's LED report); pointer, wheel and typed text not re-verified | Short press verified both ways (suspend and wake, 2026-11-17); long press and reset not exercised | List, mount and unmount verified (2026-11-17) | Session token only: password login is quarantined, see [nanokvm/PROVENANCE.md](../crates/flashdk-adapters/src/nanokvm/PROVENANCE.md). HTTPS with pinning verified with HTTPS enabled on the device; stock units have it off |
+| JetKVM | Pointer movement seen on the host (2026-11-17). **Keyboard input and mouse click showed no visible effect in that check, so treat both as unverified** until someone watching the real screen confirms them. Earlier notes recorded HID as verified | Not implemented (ATX/DC extension methods uncaptured) | List, mount CD-ROM and unmount verified over TLS (2026-11-17 and 2026-11-24) with a full-size ISO; two 64 KB test images were refused by the device (errno 525). Disk mode and upload captured but not in the adapter | Signaling runs over HTTP or HTTPS with pinning. One active session at a time: a library connect takes the session from the browser tab. Firmware 0.5.9 to 0.5.11-dev seen |
 | GL.iNet | Live, verified (key/mouse/wheel/paste all confirmed against the real API). Absolute mouse move and left click have an **observed effect on a real target** (2026-10-07, Proxmox installer); keyboard effect observed too (Ctrl+Alt+F3 and typed commands in the installer shell) | Live API accepted (`power`/`power_long`/`reset` all return `ok:true`); a host is now attached, but there is no ATX board, so power effect and power-state reads are unverified (state reads `false` even while the host runs) | Live, verified: list, upload, mount, unmount, remove (host-confirmed: swapping the mounted image with the host running changed `sr0`'s size and label, no reboot needed) | Turns out to run the `kvmd` daemon stack itself, confirmed via its own `/api/info`; its own login-and-token auth, not PiKVM's static headers. See [captures/glinet-comet-kvmd-api.md](captures/glinet-comet-kvmd-api.md) |
 
 "Verified" means exercised against a real, owned device and the result checked, not
@@ -95,13 +95,12 @@ specific work needs an AMT 3.0+ unit to verify against; see
   [captures/jetkvm-rpc-virtual-media.md](captures/jetkvm-rpc-virtual-media.md)). Power
   lives behind the ATX/DC extensions, which must be loaded before use; the load and
   action methods are uncaptured, and this unit's ATX hardware status is unconfirmed.
-- **A UniFFI layer.** Nothing generates Swift or Kotlin bindings yet; the crates are
-  Rust-only consumers today (see the example binaries under
-  `crates/flashdk-adapters/examples/`).
-- **TOFU pinning beyond PiKVM and Redfish.** The mechanism in `tls_pin.rs` is
-  reused as-is by `redfish::RedfishBmc`, and now by NanoKVM and JetKVM when the policy selects HTTPS (their HTTPS is off by default; untested on a device). JetKVM's
-  HTTP signaling is unauthenticated by transport (its media is secured by
-  WebRTC's own DTLS instead).
+- **Swift bindings.** `flashdk-ffi` generates Kotlin and builds for Android (arm64-v8a and
+  x86_64). The app session reported on 2026-11-24 that it connected to a JetKVM from
+  Android. This repository has not verified that, and Swift generation has not been tried.
+- **TLS verification gaps.** `PreferTls` falling back to cleartext has been tested only
+  against loopback servers. PiKVM and GL.iNet are HTTPS only, and their behaviour over
+  plain HTTP has not been checked.
 
 ## What the previous notes got wrong
 

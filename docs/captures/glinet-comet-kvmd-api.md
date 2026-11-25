@@ -8,7 +8,7 @@ config), no host attached to its capture port.
 `rpi4`, model `v3`.
 **Method:** direct HTTPS requests (`curl -k`, ignoring the device's own
 self-signed certificate, the same trust model PiKVM's TOFU pinning already
-handles) against `https://10.0.10.22/`. No vendor source, firmware image, or
+handles) against `https://192.0.2.22/`. No vendor source, firmware image, or
 frontend JavaScript bundle was read; the frontend bundle actually served by
 this device was deliberately left unopened, per [CLEANROOM.md](../../CLEANROOM.md)'s
 "reading source to understand an implementation" prohibition. Every fact below

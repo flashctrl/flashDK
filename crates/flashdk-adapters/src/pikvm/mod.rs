@@ -48,7 +48,7 @@ pub struct PiKvm {
 }
 
 impl PiKvm {
-    /// Point an adapter at `host` (e.g. "10.0.10.20") with kvmd credentials.
+    /// Point an adapter at `host` (e.g. "192.0.2.20") with kvmd credentials.
     ///
     /// PiKVM ships a self-signed certificate, so ordinary CA-chain validation can
     /// never succeed. Rather than disabling certificate checking outright (which
@@ -325,14 +325,14 @@ mod security_tests {
     #[test]
     fn reports_tls_and_the_stored_pin() {
         let store = Arc::new(MemoryPinStore::default());
-        let kvm = PiKvm::with_pin_store("10.0.0.5", "u", "p", store.clone()).unwrap();
+        let kvm = PiKvm::with_pin_store("192.0.2.5", "u", "p", store.clone()).unwrap();
         assert_eq!(
             kvm.security(),
             ConnectionSecurity::Tls { pinned: None },
             "no pin before first connect"
         );
 
-        store.set("10.0.0.5", [7u8; 32]);
+        store.set("192.0.2.5", [7u8; 32]);
         assert_eq!(
             kvm.security(),
             ConnectionSecurity::Tls {

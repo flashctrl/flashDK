@@ -3,7 +3,7 @@
 //! if something is already mounted, so it never disturbs an existing mount.
 //!
 //! ```bash
-//! NANOKVM_HOST=10.0.10.11 NANOKVM_TOKEN='...' \
+//! NANOKVM_HOST=192.0.2.11 NANOKVM_TOKEN='...' \
 //!   cargo run -p flashdk-adapters --example nanokvm_media
 //! ```
 

@@ -86,7 +86,7 @@ where
     Err(last.unwrap_or_else(|| Error::Transport("no connection scheme allowed".into())))
 }
 
-/// `host` may carry a port ("10.0.10.10:8080"); otherwise use the scheme's default.
+/// `host` may carry a port ("192.0.2.10:8080"); otherwise use the scheme's default.
 fn authority(host: &str, scheme: Scheme) -> String {
     let has_port = host.rsplit_once(':').is_some_and(|(h, p)| {
         !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) && !h.ends_with(':')
@@ -209,11 +209,11 @@ mod tests {
 
     #[test]
     fn authority_adds_default_ports_only_when_missing() {
-        assert_eq!(authority("10.0.0.1", Scheme::Https), "10.0.0.1:443");
-        assert_eq!(authority("10.0.0.1", Scheme::Http), "10.0.0.1:80");
-        assert_eq!(authority("10.0.0.1:8080", Scheme::Http), "10.0.0.1:8080");
-        assert_eq!(tls_name("10.0.0.1:8443"), "10.0.0.1");
-        assert_eq!(tls_name("kvm.lan"), "kvm.lan");
+        assert_eq!(authority("192.0.2.1", Scheme::Https), "192.0.2.1:443");
+        assert_eq!(authority("192.0.2.1", Scheme::Http), "192.0.2.1:80");
+        assert_eq!(authority("192.0.2.1:8080", Scheme::Http), "192.0.2.1:8080");
+        assert_eq!(tls_name("192.0.2.1:8443"), "192.0.2.1");
+        assert_eq!(tls_name("kvm.example"), "kvm.example");
     }
 
     #[tokio::test]
@@ -274,7 +274,7 @@ mod tests {
     fn https_redirect_maps_to_tls_required() {
         use tokio_tungstenite::tungstenite::http::HeaderMap;
         let mut h = HeaderMap::new();
-        h.insert("location", "https://10.0.0.1/".parse().unwrap());
+        h.insert("location", "https://192.0.2.1/".parse().unwrap());
         assert_eq!(redirect_error(&h).error, Error::TlsRequired);
         assert!(!redirect_error(&h).downgrade_ok);
         assert!(matches!(

@@ -223,11 +223,11 @@ mod tests {
     fn tofu_pins_then_rejects_a_changed_certificate() {
         let store: Arc<dyn PinStore> = Arc::new(MemoryPinStore::default());
         let provider = rustls::crypto::aws_lc_rs::default_provider();
-        let verifier = TofuVerifier::new("device.local", store, provider);
+        let verifier = TofuVerifier::new("device.example", store, provider);
 
         let cert_a = CertificateDer::from(vec![1, 2, 3]);
         let cert_b = CertificateDer::from(vec![4, 5, 6]);
-        let name = ServerName::try_from("device.local").unwrap();
+        let name = ServerName::try_from("device.example").unwrap();
         let now = UnixTime::now();
 
         assert!(verifier

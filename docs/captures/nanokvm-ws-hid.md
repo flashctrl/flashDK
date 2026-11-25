@@ -1,6 +1,6 @@
 # Capture: NanoKVM /api/ws binary HID protocol (wire-observed)
 
-Device: NanoKVM PCIe, app 2.5.0, 10.0.10.10. WebSocket: `ws://<host>/api/ws`
+Device: NanoKVM PCIe, app 2.5.0, 192.0.2.10. WebSocket: `ws://<host>/api/ws`
 (also available over wss/443). Auth: `nano-kvm-token` cookie (JWT from AES login).
 
 Method: a generic `WebSocket.send` hook installed in the browser recorded the exact

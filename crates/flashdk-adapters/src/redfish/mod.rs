@@ -52,7 +52,7 @@ pub struct RedfishBmc {
 }
 
 impl RedfishBmc {
-    /// Log in to `host` (e.g. `"10.0.10.30"`) and discover its first `ComputerSystem`
+    /// Log in to `host` (e.g. `"192.0.2.30"`) and discover its first `ComputerSystem`
     /// and `VirtualMedia` collection.
     ///
     /// Redfish services normally present a certificate signed by the vendor's own
