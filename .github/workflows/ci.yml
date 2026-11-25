@@ -33,12 +33,34 @@ jobs:
         run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-D warnings"
+      - name: Test
+        run: cargo test --workspace --all-features
+
+  android:
+    name: android build (flashdk-ffi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --version 4.1.2 --locked
+      # The runner image ships the NDK; this is the same API level the app targets.
+      - name: Cross-compile for arm64-v8a and x86_64
+        run: cargo ndk --platform 26 -t arm64-v8a -t x86_64 build --release -p flashdk-ffi
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
 
   compliance:
     name: license, supply-chain & clean-room
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The release-age check compares Cargo.lock with the pull request base.
+          fetch-depth: 0
 
       # Licenses, security advisories, dependency bans, and source integrity: the
       # machine-enforced half of CLEANROOM.md. A copyleft or unknown-source
@@ -47,6 +69,11 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check licenses advisories bans sources
+
+      # New dependency versions wait out the cooldown (docs/decisions.md #12).
+      - name: Release-age cooldown
+        if: github.event_name == 'pull_request'
+        run: scripts/check-release-age.sh "origin/${{ github.base_ref }}"
 
       # Clean-room methodology: every vendor adapter must ship a provenance
       # attestation. No provenance, no merge.

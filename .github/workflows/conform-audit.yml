@@ -16,7 +16,7 @@ jobs:
     # applies to conformIT's own dependencies. Re-verify and re-pin
     # deliberately when you want the latest version, don't switch to
     # @main to avoid doing that.
-    uses: placidIT/conformIT/.github/workflows/reusable-audit.yml@v4
+    uses: almadon/conformIT/.github/workflows/reusable-audit.yml@v4
     with:
       # One `owner/repo` per line; list more than one to audit several
       # repos in the same run. Leaving `targets` unset does NOT default
@@ -28,5 +28,5 @@ jobs:
     secrets:
       # Name this whatever you like; it just has to match a real secret
       # in this repo's own settings.
-      reporting_token: ${{ secrets.CONFORM_REPORTING_TOKEN }}
+      reporting_token: ${{ secrets.CONFORMIT_REPORTING_TOKEN }}
 
