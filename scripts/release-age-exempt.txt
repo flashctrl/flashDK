@@ -1,0 +1,5 @@
+# Versions allowed inside the release-age cooldown: "name version reason".
+# Security fixes only. Remove a line once the version has aged past the window.
+url 2.5.9 security fix for RUSTSEC-2026-0592 (stack overflow in Url::origin)
+form_urlencoded 1.2.3 required by the url 2.5.9 security fix
+cookie 0.18.3 security fix for RUSTSEC-2026-0594 (repeating private-cookie nonces)

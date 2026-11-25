@@ -261,3 +261,24 @@ and our NanoKVM has HTTPS off, so its TLS path cannot be checked on it. The FFI 
 been updated here; the FFI (`flashdk-ffi`) now exposes the policy, `security()` and a NanoKVM token connect. Verified live on a NanoKVM with HTTPS enabled (RequireTls and PreferTls connect and pin; CleartextOnly gets `TlsRequired` from its redirect).
 
 **What would justify revisiting:** vendors enabling TLS by default.
+
+## 12. A release-age cooldown for dependencies
+
+**Chosen:** a new release is adopted only after 7 days, or 14 for a major version (for a
+0.x crate, a minor bump is a major one). Security fixes are exempt and are listed with
+their advisory in `scripts/release-age-exempt.txt`. Dependabot is configured with the
+same waits, and `scripts/check-release-age.sh` checks `Cargo.lock` against a base ref.
+This follows conformIT's decision #26.
+
+**Why:** a release taken the minute it appears is how a hijacked package reaches users.
+A lockfile refresh on 2026-11-24 had pulled in many versions only one to six days old,
+including `str0m` 0.26.0 at two days old, which for a 0.x crate is a major bump.
+
+**What it cost:** fixes that are not flagged as security fixes arrive a week or two
+late, and `str0m` stays on 0.24 until 0.26 has aged. The check is not yet run in CI,
+because it needs a base ref and network access; running it is a step in review.
+
+**Rejected:** failing CI on any young version with no exemption list, because it would
+block the security fixes the policy exempts.
+
+**What would justify revisiting:** Cargo gaining a stable minimum-publish-age setting.

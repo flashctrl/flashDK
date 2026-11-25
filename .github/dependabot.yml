@@ -1,0 +1,20 @@
+# New releases wait out a cooldown before they are proposed: 7 days, or 14 for a major
+# version. Dependabot does not apply the cooldown to security updates. See
+# docs/decisions.md #12.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Actions are not all semver-versioned, so they get the longer wait only where
+    # Dependabot can tell; the default covers the rest.
+    cooldown:
+      default-days: 7
