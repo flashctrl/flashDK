@@ -199,3 +199,29 @@ functional benefit); leaving commit format entirely unstandardized going forward
 
 **What would justify revisiting:** nothing. This is the intended permanent state,
 not a placeholder.
+
+## 10. Quarantine NanoKVM password login, supply a session token instead
+
+**Chosen:** the NanoKVM adapter no longer logs in with a password. `NanoKvm::connect`
+returns `NotSupported`, and `NanoKvm::connect_with_token` accepts a session token the
+user obtained by signing in through the device's own web interface.
+
+**Why:** the device requires a client-side encryption of the password, using a
+passphrase that exists only in the vendor's web client. It is not on the wire and not in
+the vendor's documentation. The code we had used it, which means we could not show it was
+written from permitted sources (CLEANROOM.md). We tested plain-password login (rejected),
+HTTP Basic (rejected), and TLS (no listener on the tested unit), and found no permitted
+route to the secret. A secret cannot be recovered from ciphertext by black-box testing.
+
+**What it cost:** NanoKVM users cannot sign in with a password in any app built on this
+SDK. An app must obtain a token another way, for example by showing the vendor's own web
+login in a WebView and reading its cookie, which is clumsy and is the vendor's interface
+rather than ours. Tokens expire, so users re-authenticate. The removed code remains in
+git history, whose rewrite is a separate, unmade decision.
+
+**Rejected:** keeping the code with a disclaimer (a disclaimer does not make a copied
+constant clean); reading the web client "just to confirm" the constant (the exact act the
+charter forbids); dropping NanoKVM entirely (the HID protocol is wire-derived and fine).
+
+**What would justify revisiting:** Sipeed documenting the login, or granting permission
+in writing. Either restores password login, from that document.
