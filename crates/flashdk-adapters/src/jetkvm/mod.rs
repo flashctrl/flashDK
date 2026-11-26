@@ -81,6 +81,9 @@ impl JetKvm {
                     .send()
                     .await
                     .map_err(|e| Attempt::from_source(Error::Transport(e.to_string()), &e))?;
+                if resp.status().is_redirection() {
+                    return Err(crate::wsconn::redirect_error(resp.headers()));
+                }
                 if !resp.status().is_success() {
                     return Err(Attempt::fatal(Error::Auth(format!(
                         "login failed: HTTP {}",
@@ -156,8 +159,8 @@ impl Device for JetKvm {
             power_on_off: true, // via ATX/DC extension hardware
             power_reset: true,
             virtual_media: true,
-            wake_on_lan: true,   // getWakeOnLanDevices (rpc channel)
-            tls_pinnable: false, // HTTP signaling; media secured by WebRTC's own DTLS
+            wake_on_lan: true,  // getWakeOnLanDevices (rpc channel)
+            tls_pinnable: true, // when HTTPS is enabled on the device
         }
     }
 

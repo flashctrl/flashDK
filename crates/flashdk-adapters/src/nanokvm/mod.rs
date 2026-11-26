@@ -67,6 +67,13 @@ struct NkResponse {
     data: serde_json::Value,
 }
 
+/// `GET /api/storage/media/state` reports `"state":"unsupported"` while the virtual disk
+/// is switched off in the device settings (observed live; with it on the state was
+/// `"partition"` idle and `"image"` with an image mounted).
+fn virtual_disk_disabled(data: &serde_json::Value) -> bool {
+    data["state"].as_str() == Some("unsupported")
+}
+
 /// Pull the firmware/image version out of a `GET /api/vm/info` `data` payload
 /// (`{"image":"v1.4.0","application":"2.5.0","deviceKey":"...",...}`, verified live
 /// against a NanoKVM PCIe; see the unit tests below for the exact captured shape).
@@ -174,7 +181,7 @@ impl NanoKvm {
 
     async fn send(&self, bytes: Vec<u8>) -> Result<()> {
         let mut sink = self.ws.lock().await;
-        sink.send(Message::Binary(bytes))
+        sink.send(Message::Binary(bytes.into()))
             .await
             .map_err(|e| Error::Transport(e.to_string()))
     }
@@ -243,7 +250,7 @@ impl Device for NanoKvm {
             power_reset: true, // real reset line via GPIO (type "reset")
             virtual_media: true,
             wake_on_lan: false,
-            tls_pinnable: false,
+            tls_pinnable: true, // when HTTPS is enabled on the device
         }
     }
 
@@ -365,12 +372,27 @@ impl VirtualMedia for NanoKvm {
     }
 
     async fn mount(&self, name: &str) -> Result<()> {
-        self.post_json(
-            "/api/storage/image/mount",
-            serde_json::json!({ "file": name }),
-        )
-        .await
-        .map(|_| ())
+        match self
+            .post_json(
+                "/api/storage/image/mount",
+                serde_json::json!({ "file": name }),
+            )
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // A refusal is opaque (`code -2`). When the device says its virtual disk
+                // is off, say so: the user can fix it in the device settings.
+                if let Ok(state) = self.get_data("/api/storage/media/state").await {
+                    if virtual_disk_disabled(&state) {
+                        return Err(Error::NotSupported(
+                            "virtual disk is disabled on the device (enable it in its Device settings)",
+                        ));
+                    }
+                }
+                Err(e)
+            }
+        }
     }
 
     async fn unmount(&self) -> Result<()> {
@@ -386,7 +408,17 @@ impl VirtualMedia for NanoKvm {
 
 #[cfg(test)]
 mod tests {
-    use super::extract_image_version;
+    use super::{extract_image_version, virtual_disk_disabled};
+
+    #[test]
+    fn recognises_a_disabled_virtual_disk() {
+        let off = serde_json::json!({"state":"unsupported","type":"","rel":"","hidOnly":false,"open":[],"cdrom":false,"localWritable":true});
+        let idle = serde_json::json!({"state":"partition","type":"partition","rel":"","hidOnly":false,"open":[],"cdrom":false,"localWritable":false});
+        let mounted = serde_json::json!({"state":"image","type":"image","rel":"x.iso","hidOnly":false,"open":[],"cdrom":false,"localWritable":true});
+        assert!(virtual_disk_disabled(&off));
+        assert!(!virtual_disk_disabled(&idle));
+        assert!(!virtual_disk_disabled(&mounted));
+    }
 
     /// The exact `data` payload observed live from a NanoKVM PCIe's
     /// `GET /api/vm/info` (app 2.5.0, image v1.4.0).

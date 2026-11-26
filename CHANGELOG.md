@@ -17,6 +17,10 @@ bumps and dated entries begin at the first real release.
 ### Added
 
 - `TlsPolicy` and `ConnectionSecurity` in `flashdk-core`, a `Device::security()` method, and `flashdk_adapters::scheme` with the HTTPS-or-HTTP decision logic. PiKVM and GL.iNet report their pinned certificate. See docs/decisions.md #11.
+- FFI: `connect` and `connect_nanokvm_with_token` now give up after 30 s with a `Transport` error ("connect timed out"), so an unresponsive device can no longer hang the caller.
+- FFI: `connect` takes a `TlsPolicy` before the pin store; new `connect_nanokvm_with_token`, `Kvm::security()` returning `ConnectionSecurity`, and a `TlsRequired` error. PiKVM and GL.iNet reject `CleartextOnly` with `NotSupported`. **Breaking** for the FFI consumer (one new `connect` parameter).
+- `Error::TlsRequired` (core, and `FlashError.TlsRequired` over FFI): the device redirected plain HTTP to HTTPS. `Error` is now `#[non_exhaustive]`. Cleartext REST clients no longer follow redirects.
+- `tls_pinnable` is now true for NanoKVM and JetKVM (they pin when HTTPS is enabled on the device).
 - Stage 2 of the TLS policy: `NanoKvm::connect_with_token` and `JetKvm::connect` now take a `TlsPolicy` and a `PinStore`, and speak HTTPS plus WebSocket-over-TLS (`wsconn.rs`, certificate pinned on first use) or cleartext as the policy allows. **Breaking:** both signatures gained two parameters. Connect and handshake timeouts (10 s) now apply to the WebSocket upgrades. Verified by loopback TLS tests only, not yet against a device.
 
 - The core/adapter workspace split (`flashdk-core`, `flashdk-adapters`), with the

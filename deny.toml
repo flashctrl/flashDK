@@ -26,6 +26,16 @@ allow = [
     "MPL-2.0",
     "CC0-1.0",
     "BSL-1.0",
+    # CDLA-Permissive-2.0 is a permissive licence for *data*, not code. It enters only as
+    # webpki-root-certs (the Mozilla CA bundle), reached through
+    # reqwest 0.13 -> rustls-platform-verifier, which depends on it for
+    # cfg(target_arch = "wasm32") only. Proof of non-use (2026-11-24): the crate is absent
+    # from `cargo tree` for aarch64/x86_64-linux-android, aarch64-apple-ios(-sim),
+    # aarch64-apple-darwin, x86_64-unknown-linux-gnu and x86_64-pc-windows-msvc, and the
+    # release libflashdk.so (arm64-v8a) holds no CA names (a positive-control binary that
+    # embeds the bundle shows 4-32 hits per name; this library shows 0). It is in
+    # Cargo.lock only. See THIRD-PARTY-NOTICES.md. Re-verify on every dependency update.
+    "CDLA-Permissive-2.0",
 ]
 
 # --- Security advisories (RustSec): fail on known vulnerabilities and yanked crates. ---
@@ -33,12 +43,14 @@ allow = [
 version = 2
 yanked = "deny"
 # Ignore specific advisories only with a written justification. Vulnerabilities are
-# never ignored here; entries below are non-vulnerability (unmaintained) notices in
-# transitive deps we don't control and that have no safe upgrade available.
+# never ignored here; any entry must be a non-vulnerability (unmaintained) notice in a
+# transitive dep we don't control, with no safe upgrade available.
 ignore = [
-    # fxhash: unmaintained (not vulnerable), pulled via str0m -> sctp-proto. No safe
-    # upgrade exists upstream. Revisit if/when str0m migrates off it.
-    "RUSTSEC-2025-0057",
+    # basic-toml: unmaintained (not vulnerable), pulled via uniffi -> askama_derive, a
+    # build-time proc-macro used for binding code generation. It is never linked into
+    # the shipped library. No safe upgrade exists upstream. Revisit when uniffi/askama
+    # move off it.
+    "RUSTSEC-2026-0374",
 ]
 
 # --- Dependency bans: no wildcard version requirements (supply-chain hygiene).

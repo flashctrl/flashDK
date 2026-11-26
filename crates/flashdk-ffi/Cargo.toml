@@ -1,0 +1,27 @@
+[package]
+name = "flashdk-ffi"
+description = "UniFFI bindings (Kotlin/Swift) over flashdk-core and flashdk-adapters."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "flashdk"
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+# The bindgen CLI is only needed on a dev machine/CI to generate Kotlin/Swift, never
+# in the shipped library.
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
+flashdk-adapters = { path = "../flashdk-adapters", version = "0.0.1" }
+uniffi = { version = "0.32.2", features = ["tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }

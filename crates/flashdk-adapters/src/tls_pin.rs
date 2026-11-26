@@ -191,6 +191,7 @@ pub fn plain_client() -> Result<reqwest::Client, String> {
 
     reqwest::Client::builder()
         .use_preconfigured_tls(config)
+        .redirect(reqwest::redirect::Policy::none())
         .cookie_store(true)
         .build()
         .map_err(|e| e.to_string())

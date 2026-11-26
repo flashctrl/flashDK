@@ -110,7 +110,7 @@ pub async fn connect(
     let local_addr = routable_local_addr(host, &socket)?;
 
     // 2) Build the offerer Rtc: add our host candidate, then the data channels.
-    let mut rtc = Rtc::new();
+    let mut rtc = Rtc::new(Instant::now());
     let candidate =
         Candidate::host(local_addr, Protocol::Udp).map_err(|e| Error::Transport(e.to_string()))?;
     rtc.add_local_candidate(candidate);
@@ -320,7 +320,7 @@ pub async fn exchange_sdp(
 
     let inner = serde_json::json!({ "type": "offer", "sdp": offer_sdp }).to_string();
     let offer = serde_json::json!({ "type": "offer", "data": { "sd": b64.encode(inner) } });
-    ws.send(Message::Text(offer.to_string()))
+    ws.send(Message::Text(offer.to_string().into()))
         .await
         .map_err(|e| Error::Transport(e.to_string()))?;
 

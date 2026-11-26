@@ -171,6 +171,9 @@ pub async fn open_ws(
             .map_err(|e| {
                 use tokio_tungstenite::tungstenite::Error as WsError;
                 match &e {
+                    WsError::Http(resp) if resp.status().is_redirection() => {
+                        redirect_error(resp.headers())
+                    }
                     WsError::Http(resp) if resp.status() == 401 => {
                         Attempt::fatal(Error::Auth("session rejected; sign in again".into()))
                     }
@@ -178,6 +181,20 @@ pub async fn open_ws(
                 }
             })?;
     Ok(ws)
+}
+
+/// A cleartext request answered with a redirect: when it points at `https://` the device
+/// has HTTPS enforced, which the caller can fix by choosing a TLS policy.
+pub fn redirect_error(headers: &tokio_tungstenite::tungstenite::http::HeaderMap) -> Attempt {
+    let to_https = headers
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|l| l.starts_with("https://"));
+    Attempt::fatal(if to_https {
+        Error::TlsRequired
+    } else {
+        Error::Transport("unexpected redirect from the device".into())
+    })
 }
 
 #[cfg(test)]
@@ -253,6 +270,19 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
+    #[test]
+    fn https_redirect_maps_to_tls_required() {
+        use tokio_tungstenite::tungstenite::http::HeaderMap;
+        let mut h = HeaderMap::new();
+        h.insert("location", "https://10.0.0.1/".parse().unwrap());
+        assert_eq!(redirect_error(&h).error, Error::TlsRequired);
+        assert!(!redirect_error(&h).downgrade_ok);
+        assert!(matches!(
+            redirect_error(&HeaderMap::new()).error,
+            Error::Transport(_)
+        ));
+    }
+
     #[tokio::test]
     async fn refused_port_reports_a_downgradable_attempt() {
         // Port 1 on loopback has no listener: ConnectionRefused.
@@ -280,7 +310,7 @@ mod tls_tests {
         let ck = rcgen::generate_simple_self_signed(vec!["127.0.0.1".into()]).unwrap();
         let der = ck.cert.der().clone();
         let fp: [u8; 32] = Sha256::digest(der.as_ref()).into();
-        let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(ck.key_pair.serialize_der()));
+        let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(ck.signing_key.serialize_der()));
         let cfg = rustls::ServerConfig::builder_with_provider(Arc::new(
             rustls::crypto::aws_lc_rs::default_provider(),
         ))

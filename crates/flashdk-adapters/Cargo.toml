@@ -13,10 +13,12 @@ flashdk-core = { path = "../flashdk-core", version = "0.0.1" }
 # through our own rustls config (see tls_pin.rs) for TOFU cert pinning, so a single
 # rustls stack is all this crate needs (simpler license/audit surface, and no
 # OpenSSL to cross-compile for mobile later).
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
     "json",
     "cookies",
-    "rustls-tls-manual-roots-no-provider",
+    "form",
+    "query",
+    "rustls-no-provider",
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -27,20 +29,20 @@ serde_json = "1"
 # license is a compound OR/AND of Apache-2.0/ISC/MIT/BSD-3-Clause, all on our allow
 # list (deny.toml).
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
-sha2 = "0.10"
+sha2 = "0.11"
 # TLS for WebSocket upgrades (NanoKVM, JetKVM), reusing the same rustls + TOFU verifier.
 tokio-rustls = { version = "0.26", default-features = false, features = ["tls12"] }
 
 # NanoKVM: WebSocket transport for its binary HID protocol. Password login is
 # quarantined (see nanokvm/PROVENANCE.md), so no login crypto is needed here.
-tokio-tungstenite = "0.24"
+tokio-tungstenite = "0.30"
 futures-util = "0.3"
-base64 = "0.22"
+base64 = "0.23"
 tokio = { version = "1", features = ["sync", "net", "rt", "macros", "time", "io-util"] }
 
 # JetKVM: sans-IO WebRTC (MIT) for its DataChannel HID transport. We drive the UDP
 # socket + timers ourselves; no ring/copyleft in the tree.
-str0m = "0.6"
+str0m = { version = "0.26", default-features = false, features = ["aws-lc-rs"] }
 
 # NUT (Network UPS Tools): a plain TCP line protocol, port 3493, no extra crates
 # beyond tokio's own line-buffered reader/writer ("io-util" above). See
@@ -51,4 +53,4 @@ str0m = "0.6"
 # stays runtime-agnostic (the app supplies the executor).
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 # Self-signed certificates for the loopback TLS tests in wsconn.rs.
-rcgen = "0.13"
+rcgen = "0.14"

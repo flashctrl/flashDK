@@ -12,6 +12,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Everything that can go wrong talking to a KVM, in vendor-neutral terms.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The device genuinely lacks this capability (e.g. NanoKVM has no ATX *reset*).
     /// The app should hide or disable the feature, not retry.
@@ -24,6 +25,9 @@ pub enum Error {
     Transport(String),
     /// The device answered, but not in a shape we understood.
     Protocol(String),
+    /// The device only accepts HTTPS (it redirected plain HTTP to it), but the caller
+    /// asked for cleartext. Retry with `TlsPolicy::RequireTls` or `PreferTls`.
+    TlsRequired,
 }
 
 impl fmt::Display for Error {
@@ -34,6 +38,7 @@ impl fmt::Display for Error {
             Error::Auth(msg) => write!(f, "authentication error: {msg}"),
             Error::Transport(msg) => write!(f, "transport error: {msg}"),
             Error::Protocol(msg) => write!(f, "protocol error: {msg}"),
+            Error::TlsRequired => write!(f, "the device requires HTTPS"),
         }
     }
 }
