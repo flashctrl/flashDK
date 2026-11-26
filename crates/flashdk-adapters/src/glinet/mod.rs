@@ -86,7 +86,7 @@ impl GlInetKvm {
             .form(&[("user", user), ("passwd", passwd)])
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?
+            .map_err(|e| crate::tls_pin::transport_error(&e))?
             .json()
             .await
             .map_err(|e| Error::Protocol(e.to_string()))?;
@@ -152,7 +152,7 @@ impl GlInetKvm {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await
@@ -172,7 +172,7 @@ impl GlInetKvm {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await

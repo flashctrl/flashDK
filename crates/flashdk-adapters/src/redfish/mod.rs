@@ -103,7 +103,7 @@ impl RedfishBmc {
             .json(&login_body(username, password))
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
 
         if !resp.status().is_success() {
             return Err(Error::Auth(format!(
@@ -170,7 +170,7 @@ impl RedfishBmc {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         resp.json()
             .await
             .map_err(|e| Error::Protocol(e.to_string()))
@@ -183,7 +183,7 @@ impl RedfishBmc {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         if resp.status().is_success() {
             Ok(())
         } else {

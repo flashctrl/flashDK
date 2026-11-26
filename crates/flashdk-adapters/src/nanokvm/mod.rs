@@ -194,7 +194,7 @@ impl NanoKvm {
             .header("Cookie", format!("nano-kvm-token={}", self.token))
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         let r: NkResponse = resp
             .json()
             .await
@@ -215,7 +215,7 @@ impl NanoKvm {
             .json(&body)
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         let r: NkResponse = resp
             .json()
             .await
