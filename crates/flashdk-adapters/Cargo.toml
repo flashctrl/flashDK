@@ -42,7 +42,7 @@ tokio = { version = "1", features = ["sync", "net", "rt", "macros", "time", "io-
 
 # JetKVM: sans-IO WebRTC (MIT) for its DataChannel HID transport. We drive the UDP
 # socket + timers ourselves; no ring/copyleft in the tree.
-str0m = { version = "0.26", default-features = false, features = ["aws-lc-rs"] }
+str0m = { version = "0.24", default-features = false, features = ["aws-lc-rs"] }
 
 # NUT (Network UPS Tools): a plain TCP line protocol, port 3493, no extra crates
 # beyond tokio's own line-buffered reader/writer ("io-util" above). See
