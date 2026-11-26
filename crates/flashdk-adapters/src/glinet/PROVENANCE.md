@@ -2,7 +2,7 @@
 
 Per [CLEANROOM.md](../../../../CLEANROOM.md), every wire-shape fact here traces to
 live network observation against a real GL.iNet Comet (GL-RM1) this project owns,
-captured directly with `curl` against `https://10.0.10.22/`. The device's own
+captured directly with `curl` against `https://192.0.2.22/`. The device's own
 served frontend JavaScript bundle was deliberately never opened or read: even
 though it's served by a device we own, reading it to understand the API would be
 "reading source to understand an implementation," which CLEANROOM.md forbids

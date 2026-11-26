@@ -102,7 +102,7 @@ impl NanoKvm {
 
     /// Open the HID WebSocket with a session `token` the user already obtained by
     /// signing in through the device's own web interface (the `nano-kvm-token`
-    /// cookie value). `host` is e.g. "10.0.10.10". Tokens expire, so callers must
+    /// cookie value). `host` is e.g. "192.0.2.10". Tokens expire, so callers must
     /// handle `Auth` errors by asking the user to sign in again.
     ///
     /// `policy` picks HTTPS or cleartext (see [`TlsPolicy`]). NanoKVM ships with HTTPS
@@ -194,7 +194,7 @@ impl NanoKvm {
             .header("Cookie", format!("nano-kvm-token={}", self.token))
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         let r: NkResponse = resp
             .json()
             .await
@@ -215,7 +215,7 @@ impl NanoKvm {
             .json(&body)
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         let r: NkResponse = resp
             .json()
             .await
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn extracts_image_from_captured_shape() {
         let data = serde_json::json!({
-            "ips": [{"name":"eth0","addr":"10.0.10.10","version":"IPv4","type":"Wired"}],
+            "ips": [{"name":"eth0","addr":"192.0.2.10","version":"IPv4","type":"Wired"}],
             "mdns": "",
             "image": "v1.4.0",
             "application": "2.5.0",

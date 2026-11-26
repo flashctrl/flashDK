@@ -3,7 +3,7 @@
 //! Sends no text and never touches power.
 //!
 //! ```bash
-//! NANOKVM_HOST=10.0.10.11 NANOKVM_TOKEN='...' FLASHDK_TLS=prefer \
+//! NANOKVM_HOST=192.0.2.11 NANOKVM_TOKEN='...' FLASHDK_TLS=prefer \
 //!   cargo run -p flashdk-adapters --example nanokvm_hid
 //! ```
 

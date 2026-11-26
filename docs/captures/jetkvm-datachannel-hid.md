@@ -1,6 +1,6 @@
 # Capture: JetKVM WebRTC DataChannel HID (wire-observed)
 
-Device: JetKVM, http://10.0.10.21. Control rides WebRTC DataChannels, not REST/JSON
+Device: JetKVM, http://192.0.2.21. Control rides WebRTC DataChannels, not REST/JSON
 over HTTP. Captured via an RTCDataChannel.send hook in the browser while trusted
 input was generated. No vendor source read.
 

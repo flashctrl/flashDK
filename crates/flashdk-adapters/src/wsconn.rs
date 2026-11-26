@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::WebSocketStream;
 
 use crate::scheme::{fallback_allowed, schemes_to_try, Scheme};
-use crate::tls_pin::{tofu_config, PinStore};
+use crate::tls_pin::{self, tofu_config, PinStore};
 
 const TCP_TIMEOUT: Duration = Duration::from_secs(10);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -86,7 +86,7 @@ where
     Err(last.unwrap_or_else(|| Error::Transport("no connection scheme allowed".into())))
 }
 
-/// `host` may carry a port ("10.0.10.10:8080"); otherwise use the scheme's default.
+/// `host` may carry a port ("192.0.2.10:8080"); otherwise use the scheme's default.
 fn authority(host: &str, scheme: Scheme) -> String {
     let has_port = host.rsplit_once(':').is_some_and(|(h, p)| {
         !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) && !h.ends_with(':')
@@ -159,7 +159,12 @@ pub async fn open_ws(
             let tls = tokio::time::timeout(HANDSHAKE_TIMEOUT, connector.connect(name, tcp))
                 .await
                 .map_err(|_| Attempt::fatal(Error::Transport("TLS handshake timed out".into())))?
-                .map_err(|e| Attempt::fatal(Error::Transport(format!("TLS: {e}"))))?;
+                .map_err(|e| {
+                    Attempt::fatal(match tls_pin::transport_error(&e) {
+                        Error::Transport(m) => Error::Transport(format!("TLS: {m}")),
+                        other => other,
+                    })
+                })?;
             Box::new(tls)
         }
     };
@@ -209,11 +214,11 @@ mod tests {
 
     #[test]
     fn authority_adds_default_ports_only_when_missing() {
-        assert_eq!(authority("10.0.0.1", Scheme::Https), "10.0.0.1:443");
-        assert_eq!(authority("10.0.0.1", Scheme::Http), "10.0.0.1:80");
-        assert_eq!(authority("10.0.0.1:8080", Scheme::Http), "10.0.0.1:8080");
-        assert_eq!(tls_name("10.0.0.1:8443"), "10.0.0.1");
-        assert_eq!(tls_name("kvm.lan"), "kvm.lan");
+        assert_eq!(authority("192.0.2.1", Scheme::Https), "192.0.2.1:443");
+        assert_eq!(authority("192.0.2.1", Scheme::Http), "192.0.2.1:80");
+        assert_eq!(authority("192.0.2.1:8080", Scheme::Http), "192.0.2.1:8080");
+        assert_eq!(tls_name("192.0.2.1:8443"), "192.0.2.1");
+        assert_eq!(tls_name("kvm.example"), "kvm.example");
     }
 
     #[tokio::test]
@@ -274,11 +279,20 @@ mod tests {
     fn https_redirect_maps_to_tls_required() {
         use tokio_tungstenite::tungstenite::http::HeaderMap;
         let mut h = HeaderMap::new();
-        h.insert("location", "https://10.0.0.1/".parse().unwrap());
+        h.insert("location", "https://192.0.2.1/".parse().unwrap());
         assert_eq!(redirect_error(&h).error, Error::TlsRequired);
         assert!(!redirect_error(&h).downgrade_ok);
         assert!(matches!(
             redirect_error(&HeaderMap::new()).error,
+            Error::Transport(_)
+        ));
+    }
+
+    #[test]
+    fn other_failures_stay_transport_errors() {
+        let e = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        assert!(matches!(
+            crate::tls_pin::transport_error(&e),
             Error::Transport(_)
         ));
     }
@@ -368,7 +382,7 @@ mod tls_tests {
 
     #[tokio::test]
     async fn a_changed_certificate_is_refused_and_never_downgraded() {
-        let (host, _fp) = tls_server().await;
+        let (host, fp) = tls_server().await;
         let store: Arc<dyn PinStore> = Arc::new(MemoryPinStore::default());
         store.set(&host, [0xAA; 32]); // pinned to some other certificate
 
@@ -380,6 +394,23 @@ mod tls_tests {
             !err.downgrade_ok,
             "a handshake failure never permits cleartext"
         );
+        let changed = Error::CertificateChanged {
+            host: host.clone(),
+            presented: fp,
+        };
+        assert_eq!(
+            err.error, changed,
+            "apps must be able to tell a changed certificate from a network error"
+        );
+
+        // The REST clients report it the same way.
+        let http = crate::tls_pin::tofu_client(&host, store.clone()).unwrap();
+        let rest_err = http
+            .get(format!("https://{host}/"))
+            .send()
+            .await
+            .expect_err("the REST client must refuse too");
+        assert_eq!(crate::tls_pin::transport_error(&rest_err), changed);
 
         // And through the policy layer: PreferTls with a stored pin tries HTTPS only.
         let tried = std::sync::Mutex::new(Vec::new());
@@ -392,6 +423,39 @@ mod tls_tests {
             .await;
         assert!(r.is_err());
         assert_eq!(*tried.lock().unwrap(), vec![Scheme::Https]);
+    }
+
+    #[tokio::test]
+    async fn accepting_a_change_trusts_only_the_certificate_the_user_saw() {
+        let (host, _fp) = tls_server().await;
+        let store: Arc<dyn PinStore> = Arc::new(MemoryPinStore::default());
+        store.set(&host, [0xAA; 32]);
+        let err = open_ws(Scheme::Https, &host, "/", &[], &store)
+            .await
+            .err()
+            .expect("mismatch must fail");
+        let Error::CertificateChanged {
+            host: key,
+            presented,
+        } = err.error
+        else {
+            panic!("expected CertificateChanged, got {:?}", err.error);
+        };
+
+        // Had the user accepted some other fingerprint, this device stays refused.
+        let mut other = presented;
+        other[0] ^= 1;
+        store.set(&key, other);
+        assert!(open_ws(Scheme::Https, &host, "/", &[], &store)
+            .await
+            .is_err());
+
+        // Storing exactly what was presented, under the reported key, lets it in.
+        store.set(&key, presented);
+        open_ws(Scheme::Https, &host, "/", &[], &store)
+            .await
+            .map_err(|a| a.error)
+            .expect("the accepted certificate is trusted");
     }
 
     #[tokio::test]

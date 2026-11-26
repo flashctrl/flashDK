@@ -52,7 +52,7 @@ pub struct RedfishBmc {
 }
 
 impl RedfishBmc {
-    /// Log in to `host` (e.g. `"10.0.10.30"`) and discover its first `ComputerSystem`
+    /// Log in to `host` (e.g. `"192.0.2.30"`) and discover its first `ComputerSystem`
     /// and `VirtualMedia` collection.
     ///
     /// Redfish services normally present a certificate signed by the vendor's own
@@ -103,7 +103,7 @@ impl RedfishBmc {
             .json(&login_body(username, password))
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
 
         if !resp.status().is_success() {
             return Err(Error::Auth(format!(
@@ -170,7 +170,7 @@ impl RedfishBmc {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         resp.json()
             .await
             .map_err(|e| Error::Protocol(e.to_string()))
@@ -183,7 +183,7 @@ impl RedfishBmc {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         if resp.status().is_success() {
             Ok(())
         } else {

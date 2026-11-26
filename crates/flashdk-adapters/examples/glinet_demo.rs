@@ -4,7 +4,7 @@
 //! the capture port.
 //!
 //! ```bash
-//! GLINET_HOST=10.0.10.22 GLINET_USER=admin GLINET_PASS='...' \
+//! GLINET_HOST=192.0.2.22 GLINET_USER=admin GLINET_PASS='...' \
 //!   cargo run -p flashdk-adapters --example glinet_demo
 //! ```
 

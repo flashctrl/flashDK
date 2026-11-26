@@ -316,7 +316,10 @@ pub async fn exchange_sdp(
         store,
     )
     .await
-    .map_err(|a| Error::Transport(format!("signaling websocket: {}", a.error)))?;
+    .map_err(|a| match a.error {
+        Error::Transport(m) => Error::Transport(format!("signaling websocket: {m}")),
+        other => other,
+    })?;
 
     let inner = serde_json::json!({ "type": "offer", "sdp": offer_sdp }).to_string();
     let offer = serde_json::json!({ "type": "offer", "data": { "sd": b64.encode(inner) } });

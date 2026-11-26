@@ -46,7 +46,7 @@ pub struct GlInetKvm {
 }
 
 impl GlInetKvm {
-    /// Log in to `host` (e.g. `"10.0.10.22"`) with the Comet's admin credentials.
+    /// Log in to `host` (e.g. `"192.0.2.22"`) with the Comet's admin credentials.
     ///
     /// The Comet ships a self-signed certificate like PiKVM does, so this uses the
     /// same trust-on-first-use pinning; see [`crate::tls_pin`].
@@ -86,7 +86,7 @@ impl GlInetKvm {
             .form(&[("user", user), ("passwd", passwd)])
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?
+            .map_err(|e| crate::tls_pin::transport_error(&e))?
             .json()
             .await
             .map_err(|e| Error::Protocol(e.to_string()))?;
@@ -152,7 +152,7 @@ impl GlInetKvm {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await
@@ -172,7 +172,7 @@ impl GlInetKvm {
             .await
             .send()
             .await
-            .map_err(|e| Error::Transport(e.to_string()))?;
+            .map_err(|e| crate::tls_pin::transport_error(&e))?;
         Self::check(
             resp.json()
                 .await

@@ -5,7 +5,7 @@
 //! on a disposable target (not your dev host).
 //!
 //! ```bash
-//! JETKVM_HOST=10.0.10.21 JETKVM_PASS='...' \
+//! JETKVM_HOST=192.0.2.21 JETKVM_PASS='...' \
 //!   cargo run -p flashdk-adapters --example jetkvm_demo
 //! ```
 

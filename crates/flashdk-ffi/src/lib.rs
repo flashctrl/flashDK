@@ -48,6 +48,14 @@ pub enum FlashError {
     /// The device only accepts HTTPS but a cleartext policy was requested. Offer the user
     /// `RequireTls` or `PreferTls`.
     TlsRequired,
+    /// The device's certificate differs from the pinned one. Warn the user and show
+    /// `presented` (the 32-byte SHA-256 of the new certificate). Only if they accept,
+    /// call `PinStore.set(host, presented)` and connect again, so that only that exact
+    /// certificate is trusted. Do not just remove the old pin.
+    CertificateChanged {
+        host: String,
+        presented: Vec<u8>,
+    },
 }
 
 impl fmt::Display for FlashError {
@@ -60,6 +68,12 @@ impl fmt::Display for FlashError {
             Self::Protocol { detail } => write!(f, "protocol error: {detail}"),
             Self::InvalidArgument { detail } => write!(f, "invalid argument: {detail}"),
             Self::TlsRequired => write!(f, "the device requires HTTPS"),
+            Self::CertificateChanged { host, .. } => {
+                write!(
+                    f,
+                    "the TLS certificate for {host} changed since it was pinned"
+                )
+            }
         }
     }
 }
@@ -76,6 +90,10 @@ impl From<flashdk_core::Error> for FlashError {
             E::Transport(detail) => Self::Transport { detail },
             E::Protocol(detail) => Self::Protocol { detail },
             E::TlsRequired => Self::TlsRequired,
+            E::CertificateChanged { host, presented } => Self::CertificateChanged {
+                host,
+                presented: presented.to_vec(),
+            },
             // `Error` is non-exhaustive: report variants added later as a protocol error.
             other => Self::Protocol {
                 detail: other.to_string(),
@@ -512,6 +530,19 @@ mod tests {
             std::future::pending(),
         ));
         assert!(matches!(r, Err(FlashError::Transport { .. })));
+    }
+
+    #[test]
+    fn a_changed_certificate_carries_the_presented_fingerprint() {
+        let e = FlashError::from(flashdk_core::Error::CertificateChanged {
+            host: "kvm".into(),
+            presented: [9; 32],
+        });
+        assert!(matches!(
+            e,
+            FlashError::CertificateChanged { host, presented }
+                if host == "kvm" && presented == vec![9u8; 32]
+        ));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 //! polls the state for 20 s. This really presses the host's power button.
 //!
 //! ```bash
-//! NANOKVM_HOST=10.0.10.11 NANOKVM_TOKEN='...' POWER_ACTION=short \
+//! NANOKVM_HOST=192.0.2.11 NANOKVM_TOKEN='...' POWER_ACTION=short \
 //!   cargo run -p flashdk-adapters --example nanokvm_power
 //! ```
 //! `POWER_ACTION` is one of `short`, `long`, `reset`, `on`.

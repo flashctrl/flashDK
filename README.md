@@ -1,103 +1,109 @@
 # flashDK
 
+**An Apache-2.0 Rust SDK that gives apps one control interface for IP-KVM devices from different vendors.**
+
+> **Status: in testing.** Nothing is tagged or published, and several features are
+> unverified on real hardware (see [docs/STATE.md](docs/STATE.md)).
+> This project comes with no warranty or guarantee of fitness for any purpose. Use it
+> at your own risk.
+>
+> **LLM use.** flashDK is built with substantial AI assistance (Claude Code,
+> Anthropic). Adapters come from wire captures the model performed against real devices
+> the maintainer owns, and from official documentation. A human directs the work,
+> reviews changes, and owns the licensing and security decisions.
+
 [![CI](https://github.com/flashctrl/flashDK/actions/workflows/ci.yml/badge.svg)](https://github.com/flashctrl/flashDK/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-**Status: in testing.** Core HID (keyboard and mouse) is implemented and verified
-live against real hardware for PiKVM, NanoKVM, and JetKVM. Power control and virtual
-media are implemented and verified for PiKVM and NanoKVM; JetKVM's equivalents ride a
-separate JSON-RPC channel that isn't wired up yet. GL.iNet has no adapter, because
-the project doesn't own the hardware to probe it against. See
-[docs/STATE.md](docs/STATE.md) for the current picture in full, including what still
-needs a real device to finish.
+## What it does
 
-**LLM use:** this project is built with substantial AI assistance (Claude Code,
-Anthropic). Every adapter is derived from live wire captures the model performed
-against real, owned devices, with a clean-room boundary against reading any vendor's
-source (see [CLEANROOM.md](CLEANROOM.md)). A human directs the work, reviews the
-diffs, and owns the licensing and security decisions; the model does the
-protocol-level implementation and verification.
+flashDK takes a device address and credentials and returns a handle with keyboard,
+mouse, power and virtual-media operations. The same calls work across vendors, and each
+device reports which of them it supports and whether its connection is encrypted. Rust
+code uses the crates directly. Android and iOS apps are meant to use the UniFFI layer
+in `crates/flashdk-ffi`.
 
-A clean-room, **Apache-2.0** SDK for controlling IP-KVM devices across vendors
-(Sipeed NanoKVM, PiKVM, JetKVM; GL.iNet planned). One protocol implementation, meant
-to be embedded in native apps via UniFFI (Swift/Kotlin) and freely usable by any
-client, proprietary or open.
+Adapters exist for Sipeed NanoKVM, PiKVM, JetKVM and GL.iNet. There is also early,
+hardware-unverified work for Redfish, Intel AMT (protocol layer only) and the NUT UPS
+protocol.
 
-> Built entirely from wire observation and official docs, never from anyone's
-> source. See [CLEANROOM.md](CLEANROOM.md).
+## Use cases
 
-## Layout
+**Reach for it when** you are writing a client that has to drive more than one brand of
+KVM, and you need a licence that lets you ship it inside a proprietary app. The vendors'
+own firmware is often copyleft, so flashDK is written from observed network behaviour
+and public documentation instead of their source (see [CLEANROOM.md](CLEANROOM.md)).
 
-```
-crates/
-  flashdk-core/       # vendor-neutral model: traits + types, zero dependencies
-    src/
-      capability.rs     # Capabilities (what a device supports) + Vendor
-      transport.rs      # TransportKind: REST/WS vs WebRTC-DataChannel-RPC (key split)
-      hid.rs            # keyboard/mouse contract, the layer that unifies cleanly
-      power.rs          # power actions/state
-      media.rs          # virtual media (mount ISO/image)
-      device.rs         # Device umbrella trait + DeviceInfo
-      error.rs          # one Error type
-  flashdk-adapters/   # one module per vendor, implements the core traits
-    src/
-      nanokvm/  pikvm/  jetkvm/     (+ PROVENANCE.md each)
-      tls_pin.rs        # shared trust-on-first-use TLS pinning (PiKVM today)
-      lib.rs            # `Kvm` enum: runtime dispatch across vendors, no `dyn`
-docs/captures/          # raw wire-capture evidence (the clean-room audit trail)
-```
+## Getting started
 
-## Reading order (for learning)
-
-`flashdk-core/src/lib.rs` → `capability.rs` → `transport.rs` → `hid.rs` →
-`device.rs`, then `flashdk-adapters/src/lib.rs` and one adapter. The doc-comments
-(`//!` and `///`) explain the why, not just the what. For the project's own
-reasoning and history, see [docs/README.md](docs/README.md).
-
-## Build
+Install Rust with [rustup](https://rustup.rs), then run these from the repository root.
 
 ```bash
-# Install Rust once, if you haven't:
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Then, from this directory:
-cargo check     # type-check the whole workspace
-cargo doc --open --no-deps   # read the annotated API in your browser
+cargo test --workspace
 ```
 
-## What comes next
+```bash
+cargo doc --open --no-deps
+```
 
-- JetKVM power and virtual media, over its `rpc` JSON-RPC channel (the transport is
-  live; only the method names and payload shapes still need a clean wire capture)
-- A GL.iNet adapter, once a unit is available to probe against
-- A UniFFI layer generating Swift/Kotlin bindings from these same traits
-- TOFU certificate pinning extended to future TLS-capable adapters (already shipped
-  for PiKVM; see [docs/security.md](docs/security.md))
+To try an adapter against a device you own, use its example under
+`crates/flashdk-adapters/examples/`. Each file's header says which environment
+variables it reads and whether it sends input or presses a power button.
 
-## Trademarks and interoperability
+## Usage
 
-flashDK is an **independent, clean-room interoperability library**. It is not
-affiliated with, endorsed by, or sponsored by any device vendor.
+`connect` takes a `TlsPolicy`. `RequireTls` is the default choice and never sends
+credentials in cleartext. `PreferTls` falls back to cleartext only when nothing answers
+on the HTTPS port, and never after a certificate failure or for a device whose
+certificate is already pinned. `CleartextOnly` skips TLS. NanoKVM and JetKVM ship with
+HTTPS off, so a stock unit needs one of the last two. PiKVM and GL.iNet are HTTPS only.
 
-PiKVM, NanoKVM, Sipeed, JetKVM, and GL.iNet are trademarks of their respective
-owners. Those names appear here only nominatively, to state which devices flashDK
-can talk to. They are never used as flashDK's own branding or package identity, and
-CI enforces that (see `.github/workflows/ci.yml`).
+Certificates are pinned on first use. If a device later shows a different certificate,
+the connect fails with `CertificateChanged`, which carries the new certificate's
+fingerprint. It can mean an interception, so show the fingerprint to the user. Only if
+they accept, save that exact fingerprint as the new pin and reconnect. Deleting the old
+pin instead would trust whatever certificate answers next. Give the SDK a persistent pin store, or every
+launch trusts whatever certificate it sees first.
 
-Every adapter is implemented solely from observed network behaviour and official
-public documentation, never from a vendor's source code. See
-[CLEANROOM.md](CLEANROOM.md) and each adapter's `PROVENANCE.md`. This is what keeps
-the SDK licensable under Apache-2.0, independent of the vendors' own copyleft
-firmware licenses.
+NanoKVM password login is not available. It depended on a secret that only exists in
+the vendor's web client, so it was removed (see
+[PROVENANCE.md](crates/flashdk-adapters/src/nanokvm/PROVENANCE.md)). Sign in through
+the device's own web page and pass the session token to
+`NanoKvm::connect_with_token`, or `connectNanokvmWithToken` from Kotlin.
 
-## Compliance (enforced in CI)
+Kotlin bindings are generated with the `uniffi-bindgen` binary in `flashdk-ffi`, built
+with the `bindgen` feature. Swift generation has not been tried yet.
 
-Every push and PR must pass:
+## How it works
 
-| Gate | Guards against |
-|------|----------------|
-| `cargo-deny` licenses | a copyleft (GPL/LGPL) dependency forcing the SDK open |
-| `cargo-deny` advisories | shipping a known-vulnerable or yanked dependency |
-| `cargo-deny` bans / sources | wildcard versions and non-crates.io (supply-chain) deps |
-| provenance gate | an adapter without a clean-room `PROVENANCE.md` |
-| trademark gate | a vendor mark leaking into package identity |
-| fmt · clippy · check · docs | formatting, lints, compilation, doc warnings |
+`flashdk-core` holds the vendor-neutral traits and types and has no dependencies.
+`flashdk-adapters` has one module per vendor and the shared TLS pinning. `flashdk-ffi`
+wraps both for Kotlin and Swift. [docs/architecture.md](docs/architecture.md) explains
+the split.
+
+## Documentation
+
+[docs/README.md](docs/README.md) indexes the project's records. Start with
+[STATE.md](docs/STATE.md) for what is verified,
+[decisions.md](docs/decisions.md) for the reasoning and
+[security.md](docs/security.md) for the trust model. `docs/captures/` holds the wire
+evidence behind each adapter.
+
+## Development
+
+Run the checks CI runs before you push: `cargo fmt --all --check`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`cargo test --workspace`, and `cargo doc --no-deps --all-features` with
+`RUSTDOCFLAGS="-D warnings"`. CI also runs `cargo deny`, checks that every adapter has
+a `PROVENANCE.md`, keeps vendor trademarks out of package names, cross-compiles the
+FFI for Android, and holds new dependency versions to a release-age cooldown
+(`scripts/check-release-age.sh`). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+PiKVM, NanoKVM, Sipeed, JetKVM and GL.iNet are trademarks of their owners. flashDK is
+independent and is not affiliated with or endorsed by any of them. Their names appear
+only to say which devices the library talks to.
+
+## Licence
+
+Apache-2.0, see [LICENSE](LICENSE). Third-party licences that need a note are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and dependencies are listed in
+[docs/credits.md](docs/credits.md).

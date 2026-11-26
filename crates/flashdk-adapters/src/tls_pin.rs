@@ -23,6 +23,8 @@ use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use sha2::{Digest, Sha256};
 
+use flashdk_core::Error;
+
 /// A certificate's identity, as a SHA-256 fingerprint of its DER encoding.
 pub type Fingerprint = [u8; 32];
 
@@ -53,6 +55,62 @@ impl PinStore for MemoryPinStore {
         if let Ok(mut pins) = self.pins.lock() {
             pins.insert(host.to_string(), fingerprint);
         }
+    }
+}
+
+/// Why a pinned connection was refused: the host presented a different certificate from
+/// the pinned one. Carried inside the rustls error so [`transport_error`] can find it.
+#[derive(Debug)]
+pub struct CertificateMismatch {
+    pub host: String,
+    /// The fingerprint of the certificate that was refused.
+    pub presented: Fingerprint,
+}
+
+impl std::fmt::Display for CertificateMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "certificate for {} changed since it was first trusted, which is either \
+             a MITM or a re-keyed device; refusing to connect silently",
+            self.host
+        )
+    }
+}
+
+impl std::error::Error for CertificateMismatch {}
+
+/// Convert a request or handshake failure into an SDK error. A pin mismatch anywhere in
+/// the error's source chain becomes [`Error::CertificateChanged`], so an app can tell
+/// the user and ask whether to trust the new certificate; anything else is a
+/// [`Error::Transport`].
+pub fn transport_error(err: &(dyn std::error::Error + 'static)) -> Error {
+    let mut cur = Some(err);
+    while let Some(e) = cur {
+        if let Some(m) = mismatch_in(e) {
+            return Error::CertificateChanged {
+                host: m.host.clone(),
+                presented: m.presented,
+            };
+        }
+        // `io::Error::source` skips the error it wraps, so look inside it directly.
+        if let Some(io) = e.downcast_ref::<std::io::Error>() {
+            if let Some(inner) = io.get_ref() {
+                cur = Some(inner);
+                continue;
+            }
+        }
+        cur = e.source();
+    }
+    Error::Transport(err.to_string())
+}
+
+fn mismatch_in<'a>(e: &'a (dyn std::error::Error + 'static)) -> Option<&'a CertificateMismatch> {
+    match e.downcast_ref::<rustls::Error>()? {
+        rustls::Error::InvalidCertificate(rustls::CertificateError::Other(other)) => {
+            other.0.downcast_ref::<CertificateMismatch>()
+        }
+        _ => None,
     }
 }
 
@@ -107,11 +165,14 @@ impl ServerCertVerifier for TofuVerifier {
                 Ok(ServerCertVerified::assertion())
             }
             Some(pinned) if pinned == fingerprint => Ok(ServerCertVerified::assertion()),
-            Some(_) => Err(rustls::Error::General(format!(
-                "certificate for {} changed since it was first trusted, which is either \
-                 a MITM or a re-keyed device; refusing to connect silently",
-                self.host
-            ))),
+            Some(_) => Err(rustls::Error::InvalidCertificate(
+                rustls::CertificateError::Other(rustls::OtherError(Arc::new(
+                    CertificateMismatch {
+                        host: self.host.clone(),
+                        presented: fingerprint,
+                    },
+                ))),
+            )),
         }
     }
 
@@ -223,11 +284,11 @@ mod tests {
     fn tofu_pins_then_rejects_a_changed_certificate() {
         let store: Arc<dyn PinStore> = Arc::new(MemoryPinStore::default());
         let provider = rustls::crypto::aws_lc_rs::default_provider();
-        let verifier = TofuVerifier::new("device.local", store, provider);
+        let verifier = TofuVerifier::new("device.example", store, provider);
 
         let cert_a = CertificateDer::from(vec![1, 2, 3]);
         let cert_b = CertificateDer::from(vec![4, 5, 6]);
-        let name = ServerName::try_from("device.local").unwrap();
+        let name = ServerName::try_from("device.example").unwrap();
         let now = UnixTime::now();
 
         assert!(verifier

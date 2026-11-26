@@ -3,7 +3,7 @@
 //! power action, safe regardless of whether an ATX controller is attached.
 //!
 //! ```bash
-//! PIKVM_HOST=10.0.10.20 PIKVM_USER=admin PIKVM_PASS='...' \
+//! PIKVM_HOST=192.0.2.20 PIKVM_USER=admin PIKVM_PASS='...' \
 //!   cargo run -p flashdk-adapters --example pikvm_demo
 //! ```
 
