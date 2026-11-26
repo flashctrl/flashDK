@@ -99,7 +99,7 @@ specific work needs an AMT 3.0+ unit to verify against; see
   Rust-only consumers today (see the example binaries under
   `crates/flashdk-adapters/examples/`).
 - **TOFU pinning beyond PiKVM and Redfish.** The mechanism in `tls_pin.rs` is
-  reused as-is by `redfish::RedfishBmc`; NanoKVM has no TLS to pin, and JetKVM's
+  reused as-is by `redfish::RedfishBmc`, and now by NanoKVM and JetKVM when the policy selects HTTPS (their HTTPS is off by default; untested on a device). JetKVM's
   HTTP signaling is unauthenticated by transport (its media is secured by
   WebRTC's own DTLS instead).
 

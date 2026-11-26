@@ -150,20 +150,27 @@ impl ServerCertVerifier for TofuVerifier {
     }
 }
 
+/// The rustls config behind [`tofu_client`], also used directly for WebSocket TLS:
+/// no CA roots, the stored pin (or the first certificate seen) is the only anchor.
+pub fn tofu_config(host: &str, store: Arc<dyn PinStore>) -> Result<rustls::ClientConfig, String> {
+    let provider = rustls::crypto::aws_lc_rs::default_provider();
+    let verifier = Arc::new(TofuVerifier::new(host, store, provider.clone()));
+
+    Ok(
+        rustls::ClientConfig::builder_with_provider(Arc::new(provider))
+            .with_safe_default_protocol_versions()
+            .map_err(|e| e.to_string())?
+            .dangerous()
+            .with_custom_certificate_verifier(verifier)
+            .with_no_client_auth(),
+    )
+}
+
 /// Build a `reqwest::Client` that speaks TLS to `host` using trust-on-first-use
 /// pinning against `store`, with no built-in CA roots (a pin is the only trust
 /// anchor, which is the point).
 pub fn tofu_client(host: &str, store: Arc<dyn PinStore>) -> Result<reqwest::Client, String> {
-    let provider = rustls::crypto::aws_lc_rs::default_provider();
-    let verifier = Arc::new(TofuVerifier::new(host, store, provider.clone()));
-
-    let config = rustls::ClientConfig::builder_with_provider(Arc::new(provider))
-        .with_safe_default_protocol_versions()
-        .map_err(|e| e.to_string())?
-        .dangerous()
-        .with_custom_certificate_verifier(verifier)
-        .with_no_client_auth();
-
+    let config = tofu_config(host, store)?;
     reqwest::Client::builder()
         .use_preconfigured_tls(config)
         .build()

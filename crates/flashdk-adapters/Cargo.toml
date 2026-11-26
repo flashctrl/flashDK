@@ -28,6 +28,8 @@ serde_json = "1"
 # list (deny.toml).
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 sha2 = "0.10"
+# TLS for WebSocket upgrades (NanoKVM, JetKVM), reusing the same rustls + TOFU verifier.
+tokio-rustls = { version = "0.26", default-features = false, features = ["tls12"] }
 
 # NanoKVM: WebSocket transport for its binary HID protocol. Password login is
 # quarantined (see nanokvm/PROVENANCE.md), so no login crypto is needed here.
@@ -48,3 +50,5 @@ str0m = "0.6"
 # Only the runnable examples need an async runtime entrypoint; the library itself
 # stays runtime-agnostic (the app supplies the executor).
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# Self-signed certificates for the loopback TLS tests in wsconn.rs.
+rcgen = "0.13"

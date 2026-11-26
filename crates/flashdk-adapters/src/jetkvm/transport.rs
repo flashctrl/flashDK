@@ -10,7 +10,12 @@
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
+
+use crate::scheme::Scheme;
+use crate::tls_pin::PinStore;
+use crate::wsconn::open_ws;
 
 use flashdk_core::{Error, Result};
 use str0m::channel::ChannelId;
@@ -91,7 +96,12 @@ impl JetTransport {
 
 /// Establish the WebRTC connection to `host` (already-authenticated `http` client for
 /// signaling), returning a handle once the `hidrpc` channel is open.
-pub async fn connect(cookie: &str, host: &str) -> Result<JetTransport> {
+pub async fn connect(
+    cookie: &str,
+    host: &str,
+    scheme: Scheme,
+    store: &Arc<dyn PinStore>,
+) -> Result<JetTransport> {
     // 1) Bind the media socket and determine our routable local address.
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| Error::Transport(e.to_string()))?;
     socket
@@ -114,7 +124,7 @@ pub async fn connect(cookie: &str, host: &str) -> Result<JetTransport> {
         .ok_or_else(|| Error::Protocol("no offer produced".into()))?;
 
     // 3) Exchange SDP with the device and accept the answer.
-    let answer_sdp = exchange_sdp(host, cookie, &offer.to_sdp_string()).await?;
+    let answer_sdp = exchange_sdp(host, cookie, &offer.to_sdp_string(), scheme, store).await?;
     let answer = str0m::change::SdpAnswer::from_sdp_string(&answer_sdp)
         .map_err(|e| Error::Protocol(format!("bad answer SDP: {e}")))?;
     rtc.sdp_api()
@@ -282,31 +292,31 @@ fn dispatch_rpc(
 /// WebSocket (101) and the device speaks first with
 /// `{"data":{"deviceVersion":"0.5.9"},"type":"device-metadata"}`. The earlier
 /// `POST /webrtc/session` route now returns 404.
-pub async fn exchange_sdp(host: &str, cookie: &str, offer_sdp: &str) -> Result<String> {
+pub async fn exchange_sdp(
+    host: &str,
+    cookie: &str,
+    offer_sdp: &str,
+    scheme: Scheme,
+    store: &Arc<dyn PinStore>,
+) -> Result<String> {
     use base64::Engine;
     use futures_util::{SinkExt, StreamExt};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     use tokio_tungstenite::tungstenite::Message;
 
     let b64 = base64::engine::general_purpose::STANDARD;
-    let mut req = format!("ws://{host}/webrtc/signaling/client")
-        .into_client_request()
-        .map_err(|e| Error::Transport(e.to_string()))?;
-    req.headers_mut().insert(
-        "Cookie",
-        cookie
-            .parse()
-            .map_err(|_| Error::Protocol("bad cookie header".into()))?,
-    );
-    req.headers_mut().insert(
-        "Origin",
-        format!("http://{host}")
-            .parse()
-            .map_err(|_| Error::Protocol("bad origin".into()))?,
-    );
-    let (mut ws, _) = tokio_tungstenite::connect_async(req)
-        .await
-        .map_err(|e| Error::Transport(format!("signaling websocket: {e}")))?;
+    let origin = match scheme {
+        Scheme::Https => format!("https://{host}"),
+        Scheme::Http => format!("http://{host}"),
+    };
+    let mut ws = open_ws(
+        scheme,
+        host,
+        "/webrtc/signaling/client",
+        &[("Cookie", cookie.to_string()), ("Origin", origin)],
+        store,
+    )
+    .await
+    .map_err(|a| Error::Transport(format!("signaling websocket: {}", a.error)))?;
 
     let inner = serde_json::json!({ "type": "offer", "sdp": offer_sdp }).to_string();
     let offer = serde_json::json!({ "type": "offer", "data": { "sd": b64.encode(inner) } });

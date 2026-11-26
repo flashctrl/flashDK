@@ -9,7 +9,7 @@ use crate::capability::{Capabilities, Vendor};
 use crate::hid::Hid;
 use crate::media::VirtualMedia;
 use crate::power::Power;
-use crate::transport::TransportKind;
+use crate::transport::{ConnectionSecurity, TransportKind};
 
 /// Identity and firmware details, filled in after connecting.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,4 +42,8 @@ pub trait Device: Hid + Power + VirtualMedia {
     /// [`TransportKind::requires_peer_connection`] to know whether to bring up WebRTC
     /// before enabling controls.
     fn transport_kind(&self) -> TransportKind;
+
+    /// How the connection is actually secured, as opposed to what the caller asked
+    /// for. Apps use this to warn about cleartext. Cheap; no network call.
+    fn security(&self) -> ConnectionSecurity;
 }

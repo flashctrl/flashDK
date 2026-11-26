@@ -47,4 +47,4 @@ pub mod ups;
 pub use capability::{Capabilities, Vendor};
 pub use device::{Device, DeviceInfo};
 pub use error::{Error, Result};
-pub use transport::TransportKind;
+pub use transport::{ConnectionSecurity, TlsPolicy, TransportKind};

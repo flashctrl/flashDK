@@ -10,9 +10,20 @@
 //! ```
 
 use flashdk_adapters::nanokvm::NanoKvm;
+use flashdk_adapters::tls_pin::MemoryPinStore;
 use flashdk_core::media::VirtualMedia;
 use flashdk_core::power::Power;
-use flashdk_core::Device;
+use flashdk_core::{Device, TlsPolicy};
+use std::sync::Arc;
+
+/// FLASHDK_TLS=require|prefer|cleartext (default prefer).
+fn policy() -> TlsPolicy {
+    match std::env::var("FLASHDK_TLS").as_deref() {
+        Ok("require") => TlsPolicy::RequireTls,
+        Ok("cleartext") => TlsPolicy::CleartextOnly,
+        _ => TlsPolicy::PreferTls,
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,13 +31,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token = std::env::var("NANOKVM_TOKEN").expect("set NANOKVM_TOKEN");
 
     println!("Opening HID WebSocket with the supplied session token…");
-    let kvm = NanoKvm::connect_with_token(host, &token).await?;
+    let kvm =
+        NanoKvm::connect_with_token(host, &token, policy(), Arc::new(MemoryPinStore::default()))
+            .await?;
     println!(
         "Connected to {} ({:?})",
         kvm.info().model,
         kvm.info().vendor
     );
-    println!("Transport: {:?}", kvm.transport_kind());
+    println!(
+        "Transport: {:?}, security: {:?}",
+        kvm.transport_kind(),
+        kvm.security()
+    );
     println!("Capabilities: {:#?}", kvm.capabilities());
     match kvm.state().await {
         Ok(st) => println!("Power state: {:?}", st),
